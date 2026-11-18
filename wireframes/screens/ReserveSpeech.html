@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>연설 예약 팝업</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&amp;family=Noto+Sans+KR:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+h1,h2,h3{font-family:'Montserrat','Pretendard','Noto Sans KR',sans-serif;font-weight:700}
+a{color:#004165}a:hover{color:#00334F}
+</style>
+</head>
+<body>
+<div style="width: 390px; height: 920px; box-sizing: border-box; display: flex; flex-direction: column; background: #F2F3F5; color: #18181B; font-family: 'Pretendard', 'Noto Sans KR', system-ui, sans-serif; position: relative; overflow: hidden">
+<header style="display: flex; align-items: center; gap: 10px; padding: 24px 16px 12px">
+<a href="Meeting.html" aria-label="뒤로" style="display: flex; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px; border-radius: 22px; background: #FFFFFF; color: #18181B"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></a>
+<div style="display: flex; flex-direction: column"><h1 style="margin: 0; font-size: 18px">역할 예약하기</h1><span style="font-size: 12px; color: #52525B">KUTM #820 · 11/19(목) 오후 7:30</span></div>
+</header><main style="flex: 1"></main><div style="position: absolute; inset: 0; background: rgba(24,24,27,0.45)"></div>
+<div role="dialog" aria-label="연설 예약" style="position: absolute; left: 16px; right: 16px; top: 120px; display: flex; flex-direction: column; gap: 12px; padding: 22px 20px 20px; border-radius: 24px; background: #FFFFFF; box-shadow: 0 8px 24px rgba(24,24,27,0.08)">
+<div style="display: flex; align-items: center; justify-content: space-between"><h2 style="margin: 0; font-size: 19px">연설 예약</h2><a href="Reserve.html" aria-label="닫기" style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 20px; background: #F2F3F5; color: #18181B; text-decoration: none; font-size: 18px">×</a></div>
+<span style="font-size: 13px; color: #52525B">KUTM #820 · 발표자 2</span>
+<div role="radiogroup" aria-label="연설 설정 방식" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 4px; border-radius: 999px; background: #F2F3F5"><button type="button" role="radio" aria-checked="true" style="min-height: 38px; padding: 0 6px; border: 0; border-radius: 999px; background: #FFFFFF; box-shadow: 0 2px 8px rgba(24,24,27,0.08); font: inherit; font-size: 12px; font-weight: 700; color: #004165">다음 프로젝트 이어가기</button><button type="button" role="radio" aria-checked="false" style="min-height: 38px; padding: 0 6px; border: 0; border-radius: 999px; background: transparent; font: inherit; font-size: 12px; color: #52525B">직접 설정</button></div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 12px; border-radius: 10px; background: #F2F3F5">
+<span style="font-size: 12px; color: #52525B">지난 연설 다음 단계로 자동 지정</span>
+<b style="font-size: 15px">Presentation Mastery · 레벨 2</b>
+<span style="font-size: 14px">[다음 프로젝트명]</span>
+<span style="font-size: 11px; color: #52525B">지난 연설: 레벨 2 · [프로젝트명] · 10/22 KUTM #818</span>
+</div>
+<label style="display: grid; grid-template-columns: 104px minmax(0, 1fr); align-items: center; gap: 8px; font-size: 13px; color: #52525B">연설 제목<input type="text" placeholder="연설 제목 (미정이면 비워두기)" style="min-height: 44px; padding: 0 14px; border: 0; border-radius: 16px; font: inherit; font-size: 14px; color: #18181B; background: #F2F3F5; flex: 1"></label>
+<div style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 13px; color: #52525B">시간</span><div role="radiogroup" aria-label="연설 시간" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px"><button type="button" role="radio" aria-checked="false" style="min-height: 40px; border-radius: 14px; border: 0; background: #F2F3F5; font: inherit; font-size: 13px; color: #18181B">4–6분</button><button type="button" role="radio" aria-checked="true" style="min-height: 40px; border-radius: 14px; border: 0; background: #E5EDF2; font: inherit; font-size: 13px; font-weight: 700; color: #004165">5–7분</button><button type="button" role="radio" aria-checked="false" style="min-height: 40px; border-radius: 14px; border: 0; background: #F2F3F5; font: inherit; font-size: 13px; color: #18181B">8–10분</button><button type="button" role="radio" aria-checked="false" style="min-height: 40px; border-radius: 14px; border: 0; background: #F2F3F5; font: inherit; font-size: 13px; color: #18181B">18–22분</button></div></div>
+<button type="button" style="display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: #004165; font: inherit; font-size: 13px; font-weight: 700; color: #FFFFFF; text-decoration: none; min-height: 50px; font-size: 15px">연설 예약하기</button>
+</div>
+</div>
+</body>
+</html>

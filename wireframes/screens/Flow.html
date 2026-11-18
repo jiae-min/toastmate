@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>아젠다 플로우 편집</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&amp;family=Noto+Sans+KR:wght@400;500;700&amp;display=swap">
+<style>
+body{margin:0}
+h1,h2,h3{font-family:'Montserrat','Pretendard','Noto Sans KR',sans-serif;font-weight:700}
+a{color:#004165}a:hover{color:#004165}
+</style>
+</head>
+<body>
+<div style="width: 390px; height: 1120px; box-sizing: border-box; display: flex; flex-direction: column; background: #FFFFFF; color: #18181B; font-family: 'Pretendard', 'Noto Sans KR', system-ui, sans-serif">
+<header style="display: flex; flex-direction: column; gap: 12px; padding: 20px 20px 16px; background: transparent">
+<div style="display: flex; align-items: center; justify-content: space-between">
+<h1 style="margin: 0; font-size: 18px; color: #18181B">#820 아젠다 플로우</h1>
+<label style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #52525B">시작<input type="text" value="7:40" style="width: 64px; min-height: 40px; padding: 0 8px; border: 0; border-radius: 8px; font: inherit; font-size: 15px; color: #18181B; text-align: center"></label>
+</div>
+<div role="radiogroup" aria-label="편집 범위" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 4px; border-radius: 12px; background: #F2F3F5">
+<button type="button" role="radio" aria-checked="true" style="min-height: 40px; border: 0; border-radius: 9px; background: #FFFFFF; font: inherit; font-size: 14px; font-weight: 700; color: #004165">클럽 기본 플로우</button>
+<button type="button" role="radio" aria-checked="false" style="min-height: 40px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 14px; color: #52525B">이번 회차만</button>
+</div>
+<p style="margin: 0; font-size: 12px; color: #52525B">≡ 를 길게 눌러 순서 변경 · 시간은 소요 시간으로 자동 계산</p>
+</header>
+<main style="flex: 1; display: flex; flex-direction: column; gap: 8px; padding: 16px 20px 20px">
+<div style="display: grid; grid-template-columns: 24px 44px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 56px; padding: 0 12px; border: 0; border-radius: 12px; background: #F2F3F5">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7574" stroke-width="2" aria-hidden="true"><path d="M5 8h14M5 12h14M5 16h14"></path></svg>
+<span style="font-size: 13px; color: #52525B; font-variant-numeric: tabular-nums">7:40</span>
+<span style="font-size: 14px; font-weight: 700">개회 · Jiae</span>
+<span style="font-size: 13px; color: #52525B">10분</span>
+</div>
+<div style="display: grid; grid-template-columns: 24px 44px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 56px; padding: 0 12px; border: 0; border-radius: 12px; background: #F2F3F5">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7574" stroke-width="2" aria-hidden="true"><path d="M5 8h14M5 12h14M5 16h14"></path></svg>
+<span style="font-size: 13px; color: #52525B; font-variant-numeric: tabular-nums">7:50</span>
+<span style="font-size: 14px; font-weight: 700">역할 소개 · Gloria</span>
+<span style="font-size: 13px; color: #52525B">10분</span>
+</div>
+<div style="display: grid; grid-template-columns: 24px 44px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 56px; padding: 0 12px; border: 0; border-radius: 12px; background: #F2F3F5">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7574" stroke-width="2" aria-hidden="true"><path d="M5 8h14M5 12h14M5 16h14"></path></svg>
+<span style="font-size: 13px; color: #52525B; font-variant-numeric: tabular-nums">8:00</span>
+<span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 700">준비 연설</span><span style="font-size: 12px; color: #772432">메모: 시간지기 리포트 후 질의응답</span></span>
+<span style="font-size: 13px; color: #52525B">10분</span>
+</div>
+<div style="display: grid; grid-template-columns: 24px 44px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 56px; padding: 0 12px; border: 0; border-radius: 12px; background: #E5EDF2; box-shadow: 0 8px 20px rgba(24,24,27,0.12)">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#004165" stroke-width="2" aria-hidden="true"><path d="M5 8h14M5 12h14M5 16h14"></path></svg>
+<span style="font-size: 13px; color: #004165; font-variant-numeric: tabular-nums">8:10</span>
+<span style="font-size: 14px; font-weight: 700; color: #004165">쉬는 시간 · 이동 중</span>
+<span style="font-size: 13px; color: #004165">10분</span>
+</div>
+<div style="min-height: 12px; border: 0; border-radius: 12px; background: #F2F3F5"></div>
+<div style="display: grid; grid-template-columns: 24px 44px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 56px; padding: 0 12px; border: 0; border-radius: 12px; background: #F2F3F5">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7574" stroke-width="2" aria-hidden="true"><path d="M5 8h14M5 12h14M5 16h14"></path></svg>
+<span style="font-size: 13px; color: #52525B; font-variant-numeric: tabular-nums">8:20</span>
+<span style="font-size: 14px; font-weight: 700">주제 질문 세션 · Hoon</span>
+<span style="font-size: 13px; color: #52525B">20분</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 0; border-radius: 12px; background: #F2F3F5">
+<div style="display: grid; grid-template-columns: 24px 44px minmax(0, 1fr) auto; align-items: center; gap: 8px">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7574" stroke-width="2" aria-hidden="true"><path d="M5 8h14M5 12h14M5 16h14"></path></svg>
+<span style="font-size: 13px; color: #52525B; font-variant-numeric: tabular-nums">8:40</span>
+<span style="font-size: 14px; font-weight: 700">평가 · Abdul</span>
+<span style="font-size: 13px; color: #52525B">15분</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px; padding-left: 32px">
+<label style="display: flex; align-items: center; justify-content: space-between; min-height: 40px; font-size: 13px"><span>연설 평가 (2–3분)</span><input type="checkbox" checked style="width: 20px; height: 20px"></label>
+<label style="display: flex; align-items: center; justify-content: space-between; min-height: 40px; font-size: 13px; color: #6B7574"><span style="text-decoration: line-through">시간지기 리포트 요청</span><input type="checkbox" style="width: 20px; height: 20px"></label>
+<div style="display: flex; align-items: center; justify-content: space-between; min-height: 40px; font-size: 13px"><span>어지기 리포트</span><span style="padding: 2px 8px; border-radius: 8px; background: #F5E9EB; color: #772432; font-weight: 700">비어 있음</span></div>
+<div style="display: flex; align-items: center; justify-content: space-between; min-height: 40px; font-size: 13px"><span>어법지기 리포트</span><span style="color: #52525B">Yurhie Lee</span></div>
+<div style="display: flex; align-items: center; justify-content: space-between; min-height: 40px; font-size: 13px"><span>총평가자 리포트</span><span style="color: #52525B">Abdul</span></div>
+<button type="button" style="align-self: flex-start; min-height: 36px; padding: 0; border: 0; background: transparent; font: inherit; font-size: 13px; font-weight: 700; color: #004165">+ 세부 줄 · 메모 추가</button>
+</div>
+</div>
+<div style="display: grid; grid-template-columns: 24px 44px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 56px; padding: 0 12px; border: 0; border-radius: 12px; background: #F2F3F5">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7574" stroke-width="2" aria-hidden="true"><path d="M5 8h14M5 12h14M5 16h14"></path></svg>
+<span style="font-size: 13px; color: #52525B; font-variant-numeric: tabular-nums">8:55</span>
+<span style="font-size: 14px; font-weight: 700">시상 · Gloria</span>
+<span style="font-size: 13px; color: #52525B">5분</span>
+</div>
+<div style="display: grid; grid-template-columns: 24px 44px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 56px; padding: 0 12px; border: 0; border-radius: 12px; background: #F2F3F5">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7574" stroke-width="2" aria-hidden="true"><path d="M5 8h14M5 12h14M5 16h14"></path></svg>
+<span style="font-size: 13px; color: #52525B; font-variant-numeric: tabular-nums">9:00</span>
+<span style="font-size: 14px; font-weight: 700">폐회 · Jiae</span>
+<span style="font-size: 13px; color: #52525B">10분</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 0; border-radius: 12px; background: #F2F3F5">
+<span style="font-size: 13px; font-weight: 700">+ 세션 추가</span>
+<div style="display: flex; flex-wrap: wrap; gap: 6px">
+<button type="button" style="min-height: 36px; padding: 0 12px; border: 0; border-radius: 18px; background: #F2F3F5; font: inherit; font-size: 13px; color: #18181B">쉬는 시간</button>
+<button type="button" style="min-height: 36px; padding: 0 12px; border: 0; border-radius: 18px; background: #F2F3F5; font: inherit; font-size: 13px; color: #18181B">연설 질의응답</button>
+<button type="button" style="min-height: 36px; padding: 0 12px; border: 0; border-radius: 18px; background: #F2F3F5; font: inherit; font-size: 13px; color: #18181B">교육</button>
+<button type="button" style="min-height: 36px; padding: 0 12px; border: 0; border-radius: 18px; background: #18181B; font: inherit; font-size: 13px; font-weight: 700; color: #FFFFFF">직접 만들기</button>
+</div>
+</div>
+</main>
+<footer style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px 20px 24px; border-top: 1px solid #E6E9EB">
+<button type="button" style="min-height: 52px; border: 0; border-radius: 14px; background: #F2F3F5; font: inherit; font-size: 15px; font-weight: 700; color: #18181B">기본 플로우 저장</button>
+<a href="Export.html" style="display: flex; align-items: center; justify-content: center; min-height: 52px; border-radius: 14px; background: #004165; color: #FFFFFF; font-size: 15px; font-weight: 700; text-decoration: none">미리보기</a>
+</footer>
+</div>
+</body>
+</html>
