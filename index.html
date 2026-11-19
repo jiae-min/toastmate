@@ -547,7 +547,7 @@ function onboardingProfile() {
   <button class="btn block" data-act="saveprofile" data-next="1">${T('다음', 'Next')}</button>
   <p class="xs muted" style="margin:14px 0 0">${S.mode === 'supa' ? T('입력한 정보는 같은 클럽 멤버에게만 보여요.', 'Only members of your clubs can see this.') : S.mode === 'shared' ? T('claude.ai 계정으로 로그인되어 있어요. 클럽 데이터는 이 페이지를 공유받은 멤버와 함께 써요.', 'You are signed in with your claude.ai account. Club data is shared with members who can open this page.') : T('지금은 이 브라우저에만 저장돼요.', 'Data is saved in this browser only.')}</p></div></div>`;
 }
-const NAME_LANGS = [['en', '영어', 'English', 'Jiae'], ['ko', '한국어', 'Korean', '민지예'], ['ja', '일본어', 'Japanese', 'ミン・ジエ'], ['zh', '중국어', 'Chinese', '闵智艺']];
+const NAME_LANGS = [['en', '영어', 'English', 'Jiae Min'], ['ko', '한국어', 'Korean', '민지애'], ['ja', '일본어', 'Japanese', 'ミン・ジエ'], ['zh', '중국어', 'Chinese', '閔智愛']];
 const nameKey = l => String(l || 'en').startsWith('zh') ? 'zh' : String(l || 'en');
 const namesOf = d => ({ ...(d && d.name && !(d.names && Object.values(d.names).some(Boolean)) ? { en: d.name } : {}), ...((d && d.names) || {}) });
 const nameFor = (d, c) => { const n = namesOf(d); return n[nameKey(clubLang(c))] || (d && d.name) || n.en || n.ko || n.ja || n.zh || ''; };
