@@ -1734,6 +1734,7 @@ async function joinClub(c) {
   if (Store.supa && S.me.names) setTimeout(() => { const mm = myMember(c); if (mm) Store.update(`clubs/${c}/members/${mm.id}`, { names: namesOf(S.me) }).catch(() => {}); }, 1500);
 }
 function afterRender() {
+  if (Store.supa && !S.sheet) setTimeout(maybeReqPopup, 0);
   document.querySelectorAll('.segfade').forEach(w => { const sc = w.querySelector('.segs'); if (!sc) return; const upd = () => w.classList.toggle('end', sc.scrollLeft + sc.clientWidth >= sc.scrollWidth - 2); const on = sc.querySelector('.on'); if (on && on.offsetLeft + on.offsetWidth > sc.clientWidth) sc.scrollLeft = on.offsetLeft - 40; upd(); sc.addEventListener('scroll', upd, { passive: true }); });
   { const wc = document.getElementById('wrapcv'); if (wc) { drawWrapped(wc); (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => { if (document.getElementById('wrapcv') === wc) drawWrapped(wc); }); if (!appLogoImg.complete) appLogoImg.onload = () => drawWrapped(wc); } }
   if (S._keep) { for (const id in S._keep) { const i = document.getElementById(id); if (i) i.value = S._keep[id]; } S._keep = null; }
