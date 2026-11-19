@@ -38,6 +38,9 @@ a{color:#004165}
 textarea.inp{padding:12px 14px;min-height:220px;line-height:1.5;resize:vertical}
 label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;color:#52525B;margin-bottom:12px}
 div.f{font-size:13px;color:#52525B}
+.reqban{background:#FBF6D9;margin-top:4px}
+.reqban .list>.li{border-color:#EFE3A8}
+.reqdot{flex:none;min-width:28px;height:28px;padding:0 8px;border-radius:14px;background:#772432;color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
 .mrow{display:flex;align-items:center;gap:10px;min-height:48px;padding:2px 0}
 .mhead{font-weight:700;margin:6px 0 2px}
 .msep{border-top:1px solid #E6E9EB;margin-top:8px;padding-top:8px}
@@ -620,27 +623,18 @@ function watchClubReqs(c) {
   const sb = Store.supa;
   const fire = async () => {
     const { data } = await sb.from('join_requests').select('uid,name,status,created_at').eq('club_id', c).eq('status', 'pending').order('created_at');
-    S.clubReqs[c] = data || []; scheduleRender(); setTimeout(maybeReqPopup, 0);
+    S.clubReqs[c] = data || []; scheduleRender();
   };
   fire();
   let t = null; const ch = sb.channel('tm-req-' + c + '-' + uidGen()).on('postgres_changes', { event: '*', schema: 'public', table: 'join_requests', filter: `club_id=eq.${c}` }, () => { clearTimeout(t); t = setTimeout(fire, 200); }).subscribe();
   reqSubs[c] = () => sb.removeChannel(ch);
 }
 const pendingReqs = () => myClubIds().filter(c => isOfficer(c)).flatMap(c => (S.clubReqs[c] || []).map(r => ({ ...r, club: c })));
-function maybeReqPopup() {
-  if (S.sheet || S.loading || !S.me) return;
-  const fresh = pendingReqs().filter(r => !S.reqSeen.has(r.club + '/' + r.uid + '/' + r.created_at));
-  if (!fresh.length) return;
-  for (const r of pendingReqs()) S.reqSeen.add(r.club + '/' + r.uid + '/' + r.created_at);
-  S.sheet = reqSheet; scheduleRender();
+function reqBanner() {
+  const list = pendingReqs(); if (!list.length) return '';
+  return `<div class="card reqban"><div class="row" style="gap:10px;margin-bottom:4px"><span class="reqdot">${list.length}</span><div class="grow" style="min-width:0"><b>${T('새 가입 요청이 있어요', 'New join requests')}</b><div class="xs muted">${T('승인하면 바로 클럽 멤버가 돼요. 거부해도 다시 요청할 수 있어요.', 'Approved people join right away. Declined people can ask again.')}</div></div></div><div class="list">${list.map(reqRow).join('')}</div></div>`;
 }
 const reqRow = r => `<div class="li"><div class="grow" style="min-width:0"><b class="small">${esc(r.name)}</b><div class="xs muted">${esc(clubName(r.club))} · ${shortD(String(r.created_at).slice(0, 10))}</div></div><button class="btn sec sm" style="flex:none" data-act="reqdecide" data-c="${r.club}" data-u="${r.uid}" data-v="0">${T('거부', 'Decline')}</button><button class="btn sm" style="flex:none" data-act="reqdecide" data-c="${r.club}" data-u="${r.uid}" data-v="1">${T('승인', 'Approve')}</button></div>`;
-function reqSheet() {
-  const list = pendingReqs();
-  return `<h2>${T('가입 요청', 'Join requests')}</h2><p class="small muted" style="margin:6px 0 8px">${T('승인하면 바로 클럽 멤버가 돼요. 거부해도 다시 요청할 수 있어요.', 'Approved people join right away. Declined people can ask again.')}</p>
-  ${list.length ? `<div class="list">${list.map(reqRow).join('')}</div>` : `<div class="empty-state">${T('대기 중인 요청이 없어요.', 'No pending requests.')}</div>`}
-  <button class="btn sec block" style="margin-top:12px" data-act="closesheet">${list.length ? T('나중에', 'Later') : T('닫기', 'Close')}</button>`;
-}
 function clubJoin(first) {
   const mine = myClubIds();
   const all = Object.entries(S.clubs).filter(([id]) => !mine.includes(id)).sort((a, b) => (a[1].division || '').localeCompare(b[1].division || '') || String(a[1].area || '').localeCompare(String(b[1].area || ''), undefined, { numeric: true }));
@@ -694,7 +688,7 @@ function vHome() {
     <div class="slots">${[['tm', 'ge', ...leaderKeys(m)], ['sp1', 'sp2', 'sp3'], ['ev1', 'ev2', 'ev3'], ['timer', 'gram', 'ah']].map((r, i, a) => `<div class="grid3" style="${i < a.length - 1 ? 'margin-bottom:8px' : ''}">${r.map(k => slot(c, m, k)).join('')}</div>`).join('')}</div>
     <div class="row wrap end xs muted" style="gap:6px 12px;margin-top:10px"><span style="font-weight:700">${T('눌러서 예약·취소', 'Tap to book & cancel')}</span><span class="row wrap" style="gap:6px 12px"><span class="row" style="gap:4px"><i style="width:10px;height:10px;border-radius:3px;background:#fff;box-shadow:0 0 0 1px #E6E9EB;display:inline-block"></i>${T('빈 역할', 'Open')}</span><span class="row" style="gap:4px"><i style="width:10px;height:10px;border-radius:3px;background:#E5EDF2;display:inline-block"></i>${T('예약됨', 'Booked')}</span><span class="row" style="gap:4px"><i style="width:10px;height:10px;border-radius:3px;background:#772432;display:inline-block"></i>${T('내 역할', 'Mine')}</span></span></div></div>`;
   }
-  return `<div class="top" style="gap:0"><div class="cscroll">${clubSwitcher()}</div><span class="mename">${esc(S.me.name)}</span></div>${next}${roleMixCard(true)}`;
+  return `${reqBanner()}<div class="top" style="gap:0"><div class="cscroll">${clubSwitcher()}</div><span class="mename">${esc(S.me.name)}</span></div>${next}${roleMixCard(true)}`;
 }
 function homeCta(c, m, mine, open) {
   if (m.status === 'final') return '';
@@ -1762,7 +1756,6 @@ async function joinClub(c) {
   if (Store.supa && S.me.names) setTimeout(() => { const mm = myMember(c); if (mm) Store.update(`clubs/${c}/members/${mm.id}`, { names: namesOf(S.me) }).catch(() => {}); }, 1500);
 }
 function afterRender() {
-  if (Store.supa && !S.sheet) setTimeout(maybeReqPopup, 0);
   document.querySelectorAll('.segfade').forEach(w => { const sc = w.querySelector('.segs'); if (!sc) return; const upd = () => w.classList.toggle('end', sc.scrollLeft + sc.clientWidth >= sc.scrollWidth - 2); const on = sc.querySelector('.on'); if (on && on.offsetLeft + on.offsetWidth > sc.clientWidth) sc.scrollLeft = on.offsetLeft - 40; upd(); sc.addEventListener('scroll', upd, { passive: true }); });
   { const wc = document.getElementById('wrapcv'); if (wc) { drawWrapped(wc); (document.fonts ? document.fonts.ready : Promise.resolve()).then(() => { if (document.getElementById('wrapcv') === wc) drawWrapped(wc); }); if (!appLogoImg.complete) appLogoImg.onload = () => drawWrapped(wc); } }
   if (S._keep) { for (const id in S._keep) { const i = document.getElementById(id); if (i) i.value = S._keep[id]; } S._keep = null; }
@@ -1776,7 +1769,7 @@ function subscribeClubs() {
     watchClubReqs(c);
     if (clubSubs[c]) continue;
     clubSubs[c] = [
-      Store.onCol(`clubs/${c}/members`, docs => { S.members[c] = Object.fromEntries(docs.map(d => [d.id, d])); scheduleRender(); setTimeout(maybeReqPopup, 0); }),
+      Store.onCol(`clubs/${c}/members`, docs => { S.members[c] = Object.fromEntries(docs.map(d => [d.id, d])); scheduleRender(); }),
       Store.onCol(`clubs/${c}/meetings`, docs => { S.meetings[c] = Object.fromEntries(docs.map(d => [d.id, d])); scheduleRender(); }),
     ];
   }
