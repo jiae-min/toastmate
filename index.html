@@ -210,9 +210,9 @@ function demoSeed() {
   db['clubs/gwanghwamun'] = { official: 'GwangHwaMun Korean Toastmasters Club', nick: '광화문 토스트마스터즈', division: 'A', area: '13', langs: ['ko'], start: '19:30', end: '21:30', venue: '공간클라크', address: '서울 종로구 새문안로 42 피어선빌딩 1108호', maps: { naver: 'https://naver.me/FvEI4Ck5', kakao: 'https://kko.to/5a9oqO26c9', google: 'https://maps.app.goo.gl/Vid51WSbPrCWXkD9A' }, fee: { on: true, target: 'all', bank: '국민은행', account: '000000-00-000000', holder: '광화문토스트마스터즈', amount: '10,000원' }, flow: flow(), dcp: { '2026-27': { l1: 4, l2: 3, l3: 2, l4: 1, newm: 4, t1: 5, t2: 2, base: 20, members: 24, csp: true, dues: true } } };
   const people = {
     kutm: [['Jiae', true, 'President', ME], ['Daniel', true, 'VP Education'], ['Sora', true, 'VP Membership'], ['Kevin', false], ['Mina', false], ['Jason', false], ['Yuna', false], ['Chris', false], ['Hana', false], ['Leo', false], ['Grace', false], ['Tom', false]],
-    gwanghwamun: [['민지예', true, '교육 부회장', ME], ['김하늘', true, '회장'], ['박서준', true, '홍보 부회장'], ['이수민', false], ['정우진', false], ['최유리', false], ['한도윤', false], ['오지민', false], ['윤채원', false], ['강민호', false], ['서지안', false], ['임다은', false]],
+    gwanghwamun: [['민지애', true, '교육 부회장', ME], ['김하늘', true, '회장'], ['박서준', true, '홍보 부회장'], ['이수민', false], ['정우진', false], ['최유리', false], ['한도윤', false], ['오지민', false], ['윤채원', false], ['강민호', false], ['서지안', false], ['임다은', false]],
   };
-  for (const c in people) people[c].forEach(([name, officer, position, uid], i) => { db[`clubs/${c}/members/${c[0]}m${i}`] = { name, officer, position: position || '', uid: uid || '', ...(uid ? { names: { en: 'Jiae', ko: '민지예' } } : {}) }; });
+  for (const c in people) people[c].forEach(([name, officer, position, uid], i) => { db[`clubs/${c}/members/${c[0]}m${i}`] = { name, officer, position: position || '', uid: uid || '', ...(uid ? { names: { en: 'Jiae', ko: '민지애' } } : {}) }; });
   const pick = (c, i) => ({ mid: `${c[0]}m${((i % 11) + 11) % 11 + 1}` });
   const meKey = c => ({ mid: `${c[0]}m0` });
   const themesEn = [['Fresh Starts', 'What is one habit you started this year?', 'Resilient', 'Able to recover quickly from difficulties', 'She stayed resilient after the setback.'], ['Small Joys', 'What made you smile this week?', 'Savor', 'To enjoy something slowly', 'Savor every bite of the cake.'], ['Crossroads', 'Tell us about a choice that changed you.', 'Pivotal', 'Of crucial importance', 'It was a pivotal moment in my career.'], ['Home', 'Where do you feel most at home?', 'Cozy', 'Warm and comfortable', 'The café felt cozy on a rainy day.']];
@@ -241,7 +241,7 @@ function demoSeed() {
   const today = todayStr();
   db['events/demo1'] = { title: 'District 93 외국인 한국어 스피치 페스티벌', date: '2026-12-12', time: '13:00', place: '서울' };
   db['events/demo2'] = { title: 'Area 13·14 Council Meeting', date: '2026-11-28', time: '10:00', place: 'Online' };
-  db['people/' + ME] = { name: 'Jiae', names: { en: 'Jiae', ko: '민지예' }, realName: '민지예', clubs: ['kutm', 'gwanghwamun'], path: 'Presentation Mastery', level: 3, goal: 40, manual: {} };
+  db['people/' + ME] = { name: 'Jiae', names: { en: 'Jiae', ko: '민지애' }, realName: '민지애', clubs: ['kutm', 'gwanghwamun'], path: 'Presentation Mastery', level: 3, goal: 40, manual: {} };
   const refl = [
     ['kutm', 'kmt40', 4, { nerve: 1, conf: 2, time: 0, words: 0, next: [2] }, 'TM은 흐름 잡는 게 제일 어려웠다. 다음엔 전환 멘트를 미리 써 가자.'],
     ['kutm', 'kmt41', 3, { nerve: 2, conf: 1, time: 1, words: 1, next: [0] }, '타이머 신호 보느라 집중이 흩어졌다.'],
