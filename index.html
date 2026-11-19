@@ -38,6 +38,9 @@ a{color:#004165}
 textarea.inp{padding:12px 14px;min-height:220px;line-height:1.5;resize:vertical}
 label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;color:#52525B;margin-bottom:12px}
 div.f{font-size:13px;color:#52525B}
+.mrow{display:flex;align-items:center;gap:10px;min-height:48px;padding:2px 0}
+.mhead{font-weight:700;margin:6px 0 2px}
+.msep{border-top:1px solid #E6E9EB;margin-top:8px;padding-top:8px}
 .posgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
 .poschip{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:1px;min-height:44px;padding:6px 14px;border:0;border-radius:14px;background:#F2F3F5;color:#18181B;cursor:pointer;text-align:left}
 .poschip b{font-size:14px}
@@ -1396,6 +1399,12 @@ function vSettings() {
 function vProfile() {
   return `${topbar(T('내 정보', 'My profile'), '')}<div class="card">${profileFields(S.me)}<label class="f">${T('연간 역할 목표', 'Yearly role goal')}<input class="inp" id="p_goal" type="number" value="${esc(S.me.goal || 40)}"></label><button class="btn block" data-act="saveprofile">${T('저장', 'Save')}</button></div>`;
 }
+function memberGroups(c, ms) {
+  const row = mm => `<div class="mrow"><div class="grow row wrap" style="gap:6px;min-width:0"><b class="small">${esc(mm.name)}</b>${mm.officer && mm.position ? `<span class="tag">${esc(posLabel(mm.position))}</span>` : ''}${mm.uid ? `<span class="tag gray">${T('앱 사용', 'In app')}</span>` : ''}</div><button class="btn ${mm.officer ? 'tint' : 'sec'} sm" data-act="memedit" data-c="${c}" data-id="${mm.id}" aria-label="${T('수정', 'Edit')}">${IC.pen}</button></div>`;
+  const offs = ms.filter(m => m.officer), mems = ms.filter(m => !m.officer);
+  return `<div class="mgroup"><div class="xs muted mhead">${T('운영진', 'Officers')} · ${offs.length}</div>${offs.length ? offs.map(row).join('') : `<p class="xs muted" style="margin:4px 0">${T('아직 없어요', 'None yet')}</p>`}</div>
+  <div class="mgroup msep"><div class="xs muted mhead">${T('멤버', 'Members')} · ${mems.length}</div>${mems.length ? mems.map(row).join('') : `<p class="xs muted" style="margin:4px 0">${T('아직 없어요', 'None yet')}</p>`}</div>`;
+}
 function joinSettingsCard(c, cl) {
   const reqs = (S.clubReqs[c] || []).map(r => ({ ...r, club: c })); const on = cl.acceptRequests !== false;
   return `<div class="card"><h2 style="margin-bottom:4px">${T('가입 방법', 'How people join')}</h2><p class="xs muted" style="margin:0 0 12px">${T('초대 코드를 받은 사람, 또는 운영진이 가입 요청을 승인한 사람만 클럽에 들어올 수 있어요.', 'Only people with the invite code, or whose request an officer approves, can join.')}</p>
@@ -1409,7 +1418,8 @@ function vClubSettings() {
   const { c } = S.sub || {}; const cl = S.clubs[c]; if (!cl) return topbar('', '');
   if (!S.draft.langs) S.draft.langs = (cl.langs || ['ko']).slice();
   const fee = S.draft.fee || (S.draft.fee = clone(cl.fee || { on: false, target: 'guest' }));
-  const ms = Object.values(S.members[c] || {}).sort((a, b) => (b.officer ? 1 : 0) - (a.officer ? 1 : 0) || a.name.localeCompare(b.name));
+  const pOrd = m => { const k = posKey(m.position); const n = POSITIONS.findIndex(x => x[0] === k); return n < 0 ? 99 : n; };
+  const ms = Object.values(S.members[c] || {}).sort((a, b) => (b.officer ? 1 : 0) - (a.officer ? 1 : 0) || (a.officer ? pOrd(a) - pOrd(b) : 0) || a.name.localeCompare(b.name));
   return `${topbar(T('클럽 설정', 'Club settings'), clubName(c))}
   <div class="card"><h2 style="margin-bottom:12px">${T('클럽 정보', 'Club info')}</h2>${clubInfoFields({ ...cl, langs: S.draft.langs })}
   <div class="row between" style="margin-bottom:10px"><span class="small muted">${T('회비', 'Fee')}</span><div class="seg" style="width:160px"><button class="${fee.on ? 'on' : ''}" data-act="fee" data-k="on" data-v="1">${T('있음', 'Yes')}</button><button class="${!fee.on ? 'on' : ''}" data-act="fee" data-k="on" data-v="0">${T('없음', 'No')}</button></div></div>
@@ -1419,7 +1429,7 @@ function vClubSettings() {
   ${(() => { if (!S.draft.flow) S.draft.flow = clone(cl.flow && cl.flow.length ? cl.flow : DEFAULT_FLOW()); const ed = flowEditor(S.draft.flow, null, cl.start || '19:30', (cl.langs || ['ko'])[0] === 'en' ? 'en' : 'ko'); return `<div class="card"><h2>${T('아젠다 템플릿', 'Agenda template')}</h2><p class="xs muted" style="margin:4px 0 8px">${T('새 모임을 등록할 때 이 순서가 기본으로 들어가요. ≡를 꾹 눌러 위아래로 옮겨요. 연설·평가 세션 시간은 모임마다 발표자 수에 맞춰 자동 계산돼요.', 'New meetings start with this order. Press and hold ≡ to move. Speech and evaluation times adjust to each meeting.')} ${T('종료 예정', 'Ends at')} <b class="blue">${ed.end}</b></p>${ed.html}<div class="row end" style="margin-top:14px"><button class="btn" data-act="flowsave" data-c="${c}" data-template="1">${T('템플릿 저장', 'Save template')}</button></div></div>`; })()}
   ${Store.supa ? joinSettingsCard(c, cl) : ''}
   <div class="card"><h2 style="margin-bottom:4px">${T('멤버 · 운영진', 'Members & officers')}</h2><p class="xs muted" style="margin:0 0 8px">${T('운영진은 모임 등록, 텍스트 입력, 아젠다 확정을 할 수 있어요. 앱을 쓰지 않는 멤버도 이름을 등록해 두면 역할에 배정할 수 있어요.', 'Officers can add meetings, paste roles and finalize. Add members who do not use the app so you can assign them roles.')}</p>
-  <div class="list">${ms.map(mm => `<div class="li"><div class="grow"><b class="small">${esc(mm.name)}</b>${mm.uid ? `<span class="tag" style="margin-left:6px">${T('앱 사용', 'In app')}</span>` : ''}${mm.officer && mm.position ? posHtml(mm.position) : `<div class="xs muted">${mm.officer ? T('운영진', 'Officer') : T('멤버', 'Member')}</div>`}</div><button class="btn ${mm.officer ? 'tint' : 'sec'} sm" data-act="memedit" data-c="${c}" data-id="${mm.id}">${IC.pen}</button></div>`).join('')}</div>
+  ${memberGroups(c, ms)}
   <div class="row" style="margin-top:10px"><input class="inp" id="newmem" placeholder="${T('멤버 이름 (영어 이름)', 'Member name')}"><button class="btn" data-act="addmem" data-c="${c}">${T('추가', 'Add')}</button></div></div>`;
 }
 
