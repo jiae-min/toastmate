@@ -478,7 +478,8 @@ const BLOCK = {
 
 /* ================= derived helpers ================= */
 const myClubIds = () => (S.me && Array.isArray(S.me.clubs) ? [...new Set(S.me.clubs)].filter(c => S.clubs[c]) : []);
-const clubName = c => (S.clubs[c] && (S.clubs[c].nick || S.clubs[c].official)) || '';
+const clubNick = c => (S.clubs[c] && (S.clubs[c].nick || S.clubs[c].official)) || '';
+const clubName = c => ((S.me && S.me.clubNicks && S.me.clubNicks[c]) || clubNick(c));
 const clubLang = c => (S.clubs[c] && S.clubs[c].langs && S.clubs[c].langs[0]) || 'ko';
 const myMember = c => Object.values(S.members[c] || {}).find(m => m.uid === S.uid) || null;
 const canDistrict = () => S.mode === 'local' || S.isOwner || !!S.districtAdmin;
@@ -662,7 +663,7 @@ function vClubNew() {
 function clubInfoFields(c) {
   const langs = c.langs && c.langs.length ? c.langs : ['ko'];
   return `<label class="f">${T('공식 모임명', 'Official name')}<input class="inp" id="c_off" value="${esc(c.official || '')}"></label>
-  <label class="f">${T('모임 별명 (앱에 표시)', 'Nickname (shown in app)')}<input class="inp" id="c_nick" value="${esc(c.nick || '')}"></label>
+  <label class="f">${T('기본 별명 (멤버마다 바꿀 수 있어요)', 'Default nickname (each member can change theirs)')}<input class="inp" id="c_nick" value="${esc(c.nick || '')}"></label>
   <div class="two"><label class="f">${T('디비전', 'Division')}<input class="inp" id="c_div" value="${esc(c.division || '')}" placeholder="A"></label><label class="f">${T('에어리어', 'Area')}<input class="inp" id="c_area" value="${esc(c.area || '')}" placeholder="14"></label></div>
   <label class="f">${T('클럽 언어', 'Club language')}<div class="seg" style="flex-wrap:wrap;border-radius:22px">${Object.keys(LANGS).map(l => `<button type="button" class="${langs.includes(l) ? 'on' : ''}" style="flex:1 0 auto" data-act="togglelang" data-l="${l}">${T(LANGS[l][0], LANGS[l][1])}</button>`).join('')}</div></label>
   <div class="two"><label class="f">${T('모임 시작', 'Starts')}<input class="inp" type="time" id="c_start" value="${esc(c.start || '19:30')}"></label><label class="f">${T('모임 종료', 'Ends')}<input class="inp" type="time" id="c_end" value="${esc(c.end || '21:30')}"></label></div>
@@ -1027,7 +1028,7 @@ function agendaModel(c, m, flowOverride) {
   left.push({ lines: ['Toastmasters International', 'www.toastmasters.org', 'Toastmasters Korea (District 93)', 'www.district93.org'], links: [1, 3] });
   if (L === 'ko' && (club.venue || club.address)) left.push({ label: '모임장소', lines: [club.venue, club.address].filter(Boolean) });
   left.push({ label: TL('토스트마스터즈 클럽 미션', 'Club Mission'), lines: [MISSION[L]] });
-  return { L, title: club.official || clubName(c), no: m.no, blocks, left, end: t };
+  return { L, title: club.official || clubNick(c), no: m.no, blocks, left, end: t };
 }
 const koRange = (a, b) => { const f = (x, ap) => { if (!x) return ''; const [h, mm] = x.split(':').map(Number); return `${ap ? (h < 12 ? '오전 ' : '오후 ') : ''}${((h + 11) % 12) + 1}:${pad(mm)}`; }; const same = a && b && (Number(a.slice(0, 2)) < 12) === (Number(b.slice(0, 2)) < 12); return `${f(a, true)}~${f(b, !same)}`; };
 const fmtRangeL = (a, b, L) => { const f = x => { if (!x) return ''; const [h, mm] = x.split(':').map(Number); return `${((h + 11) % 12) + 1}:${pad(mm)}${h >= 12 ? 'pm' : 'am'}`; }; return `${f(a)}-${f(b)}`; };
@@ -1053,7 +1054,7 @@ function chatText(c, m) {
   const en = agLang(c) === 'en'; const L = (ko, e) => en ? e : ko; const club = S.clubs[c] || {}; const d = parseD(m.date);
   const nm = k => memberName(c, m.roles && m.roles[k]) || '';
   const dateStr = en ? `${WD_EN[d.getDay()]}, ${MON_EN[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}` : `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 (${WD_KO[d.getDay()]})`;
-  const out = [`${m.no ? '#' + m.no + ' ' : ''}${clubName(c)} ${L('정기 모임', 'Regular Meeting')}`, `${L('일시', 'Date')}: ${dateStr} ${en ? fmtRangeL(m.start, m.end, 'en') : koRange(m.start, m.end)}`, `${L('장소', 'Venue')}: ${club.venue || ''}`];
+  const out = [`${m.no ? '#' + m.no + ' ' : ''}${clubNick(c)} ${L('정기 모임', 'Regular Meeting')}`, `${L('일시', 'Date')}: ${dateStr} ${en ? fmtRangeL(m.start, m.end, 'en') : koRange(m.start, m.end)}`, `${L('장소', 'Venue')}: ${club.venue || ''}`];
   if (club.address) out.push(club.address);
   if (club.maps && club.maps.kakao) out.push(club.maps.kakao);
   const fee = club.fee || {};
@@ -1396,7 +1397,7 @@ function vSettings() {
   return `${topbar(T('설정', 'Settings'), '', false)}
   <div class="card"><div class="row between"><h2>${T('언어', 'Language')}</h2><div class="seg" style="width:200px"><button class="${S.lang === 'ko' ? 'on' : ''}" data-act="lang" data-l="ko">한국어</button><button class="${S.lang === 'en' ? 'on' : ''}" data-act="lang" data-l="en">English</button></div></div></div>
   <div class="card mobonly-pc"><div class="row between"><div><h2>${esc(S.me.name)}</h2><div class="xs muted">${esc([S.me.realName, S.me.memberNo, S.me.path, S.me.path ? T('레벨', 'Level') + ' ' + (S.me.level || 1) : ''].filter(Boolean).join(' · '))}</div></div><button class="btn sec sm" data-act="go" data-v="profile">${T('수정', 'Edit')}</button></div></div>
-  <div class="card"><h2 style="margin-bottom:6px">${T('내 클럽', 'My clubs')}</h2><div class="list">${ids.map(c => { const cl = S.clubs[c]; const mm = myMember(c); return `<div class="li"><div class="grow row wrap" style="gap:4px 10px;min-width:0;align-items:baseline"><b>${esc(clubName(c))}</b>${isOfficer(c) && (S.clubReqs[c] || []).length ? `<span class="tag red">${T('가입 요청', 'Requests')} ${(S.clubReqs[c] || []).length}</span>` : ''}<span class="xs muted">${esc([cl.division && T('디비전', 'Division') + ' ' + cl.division, cl.area && T('에어리어', 'Area') + ' ' + cl.area, mm && mm.position && posLabel(mm.position)].filter(Boolean).join(' · '))}</span></div>${isOfficer(c) ? `<button class="ibtn tool" data-act="openclubset" data-c="${c}" aria-label="${T('클럽 설정', 'Club settings')}">${IC.settings}</button>` : ''}<button class="ibtn tool" style="background:#F5E9EB;color:#772432" data-act="leaveask" data-c="${c}" aria-label="${T('나가기', 'Leave')}">${IC.exit}</button></div>`; }).join('')}</div><button class="btn tint block" style="margin-top:10px;min-height:44px;font-size:14px" data-act="go" data-v="clubjoin">${T('+ 클럽 추가', '+ Add a club')}</button></div>
+  <div class="card"><h2 style="margin-bottom:6px">${T('내 클럽', 'My clubs')}</h2><div class="list">${ids.map(c => { const cl = S.clubs[c]; const mm = myMember(c); return `<div class="li"><div class="grow row wrap" style="gap:4px 10px;min-width:0;align-items:baseline"><b>${esc(clubName(c))}</b>${isOfficer(c) && (S.clubReqs[c] || []).length ? `<span class="tag red">${T('가입 요청', 'Requests')} ${(S.clubReqs[c] || []).length}</span>` : ''}<span class="xs muted">${esc([cl.division && T('디비전', 'Division') + ' ' + cl.division, cl.area && T('에어리어', 'Area') + ' ' + cl.area, mm && mm.position && posLabel(mm.position)].filter(Boolean).join(' · '))}</span></div><button class="ibtn tool" data-act="nickedit" data-c="${c}" aria-label="${T('내가 보는 이름 바꾸기', 'Rename for me')}" title="${T('내가 보는 이름 바꾸기', 'Rename for me')}">${IC.pen}</button>${isOfficer(c) ? `<button class="ibtn tool" data-act="openclubset" data-c="${c}" aria-label="${T('클럽 설정', 'Club settings')}">${IC.settings}</button>` : ''}<button class="ibtn tool" style="background:#F5E9EB;color:#772432" data-act="leaveask" data-c="${c}" aria-label="${T('나가기', 'Leave')}">${IC.exit}</button></div>`; }).join('')}</div><button class="btn tint block" style="margin-top:10px;min-height:44px;font-size:14px" data-act="go" data-v="clubjoin">${T('+ 클럽 추가', '+ Add a club')}</button></div>
   <div class="card"><h3>${T('데이터', 'Data')}</h3><p class="small muted" style="margin:6px 0 0">${S.mode === 'supa' ? T('클럽 데이터는 같은 클럽 멤버끼리만 보여요. "오늘의 나" 기록은 나만 볼 수 있어요.', 'Club data is visible only to members of the same club. Reflections are private to you.') : S.mode === 'shared' ? T('claude.ai 계정으로 로그인되어 있고, 클럽 데이터는 이 페이지를 공유받은 사람들과 함께 쓰여요. "오늘의 나" 기록은 나만 볼 수 있어요.', 'Signed in with claude.ai. Club data is shared with people who can open this page. Reflections are private to you.') : T('지금은 이 브라우저에만 저장돼요. 다른 기기나 멤버와는 공유되지 않아요.', 'Saved in this browser only, not shared with other devices or members.')}</p>${S.mode === 'supa' ? `<div class="row end" style="margin-top:12px;gap:8px"><a class="btn sec sm" href="privacy.html" target="_blank" rel="noopener">${T('개인정보 처리방침', 'Privacy policy')}</a><button class="btn sec sm" data-act="logout">${T('로그아웃', 'Sign out')}</button></div>` : ''}${isAppOwner() ? `<div class="row between" style="margin-top:14px;gap:10px"><span class="small">${T('예시 데이터로 둘러보기', 'Explore with example data')}<span class="xs muted"> · ${T('저장되지 않아요', 'nothing is saved')}</span></span><div class="seg" style="width:120px;flex:none"><button class="${S.demo ? '' : 'on'}" data-act="demo" data-v="0">${T('끔', 'Off')}</button><button class="${S.demo ? 'on' : ''}" data-act="demo" data-v="1">${T('켬', 'On')}</button></div></div>` : ''}</div>
   <div class="card"><h3 class="red">${T('탈퇴', 'Delete account')}</h3><p class="small muted" style="margin:6px 0 12px">${T('내 정보와 복기 기록이 지워지고, 모든 클럽에서 나가요. 클럽 모임에 남은 역할 기록은 이름만 남아요. 되돌릴 수 없어요.', 'Your profile and reflections are deleted and you leave every club. Past meeting roles keep only your name. This cannot be undone.')}</p><button class="btn block" style="background:#F5E9EB;color:#772432" data-act="deleteask">${T('탈퇴하기', 'Delete my account')}</button></div>`;
 }
@@ -1490,6 +1491,17 @@ document.addEventListener('click', async e => {
       case 'login': { const { error } = await Store.supa.auth.signInWithOAuth({ provider: el.dataset.p, options: { redirectTo: location.origin + location.pathname } }); if (error) toast(T('로그인을 시작하지 못했어요', 'Could not start sign-in')); break; }
       case 'logout': await Store.supa.auth.signOut(); location.replace(location.pathname); break;
       case 'back': S.draft = {}; S.sheet = null; go(S.backTo || 'home'); break;
+      case 'nickedit': {
+        const cur = (S.me.clubNicks && S.me.clubNicks[c]) || '';
+        S.sheet = () => `<h2>${T('내가 보는 클럽 이름', 'Club name for me')}</h2><p class="small muted" style="margin:6px 0 12px">${T('나에게만 이 이름으로 보여요. 다른 멤버나 아젠다에는 영향이 없어요.', 'Only you see this name. Other members and agendas are not affected.')}</p><label class="f">${T('별명', 'Nickname')}<input class="inp" id="nick_v" maxlength="40" value="${esc(cur)}" placeholder="${esc(clubNick(c))}"></label><div class="two"><button class="btn sec" data-act="nicksave" data-c="${c}" data-reset="1">${T('기본값으로', 'Use default')}</button><button class="btn" data-act="nicksave" data-c="${c}">${T('저장', 'Save')}</button></div>`;
+        render(); break;
+      }
+      case 'nicksave': {
+        const v = el.dataset.reset ? '' : val('nick_v').slice(0, 40);
+        const nicks = { ...(S.me.clubNicks || {}), [c]: v };
+        await Store.update('people/' + S.uid, { clubNicks: { [c]: v } }); S.me.clubNicks = nicks;
+        S.sheet = null; toast(T('저장했어요', 'Saved')); render(); break;
+      }
       case 'closesheet': S.sheet = null; S.draft.sp = null; render(); break;
       case 'club': S.curClub = c; render(); break;
       case 'lang': keepInputs(); { const keep = {}; $app.querySelectorAll('input[id],select[id]').forEach(i => keep[i.id] = i.value); S._keep = keep; } S.lang = el.dataset.l; try { localStorage.setItem('toastmate-lang', S.lang); } catch (x) {} document.documentElement.lang = S.lang; if (S.me && S.me.name) Store.update('people/' + S.uid, { lang: S.lang }); render(); break;
