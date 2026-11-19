@@ -37,6 +37,12 @@ a{color:#004165}
 .inp{width:100%;min-height:44px;padding:0 14px;border:0;border-radius:16px;background:#F2F3F5;font-size:15px;outline-color:#004165}
 textarea.inp{padding:12px 14px;min-height:220px;line-height:1.5;resize:vertical}
 label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;color:#52525B;margin-bottom:12px}
+div.f{font-size:13px;color:#52525B}
+.req{color:#1A73E8;font-weight:700;margin-left:3px}
+.pfx{display:flex;align-items:center;background:#F2F3F5;border-radius:16px;padding-left:14px}
+.pfx:focus-within{outline:2px solid #004165}
+.pfx>span{font-size:15px;font-weight:700;color:#52525B;flex:none}
+.pfx>.inp{background:transparent;padding-left:4px;outline:0}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .seg{display:flex;background:#F2F3F5;border-radius:999px;padding:4px;gap:4px}
 .seg button{flex:1;border:0;background:transparent;min-height:36px;border-radius:999px;font-size:13px;font-weight:700;color:#52525B;cursor:pointer;padding:0 8px}
@@ -553,11 +559,11 @@ const namesOf = d => ({ ...(d && d.name && !(d.names && Object.values(d.names).s
 const nameFor = (d, c) => { const n = namesOf(d); return n[nameKey(clubLang(c))] || (d && d.name) || n.en || n.ko || n.ja || n.zh || ''; };
 function profileFields(d) {
   const names = namesOf(d || {}); if (!S.nameTab) S.nameTab = 'en';
-  return `<div class="f"><div style="margin-bottom:6px">${T('이름', 'Name')}</div><div class="seg" id="nametabs" style="margin-bottom:8px">${NAME_LANGS.map(([k, ko, en]) => `<button type="button" class="${k === S.nameTab ? 'on' : ''}" data-act="nametab" data-l="${k}">${T(ko, en)}</button>`).join('')}</div>${NAME_LANGS.map(([k, ko, en, ex]) => `<input class="inp" id="p_name_${k}" data-namefield="${k}" style="${k === S.nameTab ? '' : 'display:none'}" value="${esc(names[k] || '')}" placeholder="${T(`${ko} 이름 · 예: ${ex}`, `${en} name · e.g. ${ex}`)}" aria-label="${T(ko + ' 이름', en + ' name')}">`).join('')}<div class="xs muted" style="margin:6px 0 14px">${T('모임 언어에 맞는 이름이 역할표와 아젠다에 들어가요. 그 언어 이름이 비어 있으면 다른 이름을 써요.', 'Each club shows the name in its own language, or another one if that is empty.')}</div></div>
-  <label class="f">${T('본명 (선택)', 'Legal name (optional)')}<input class="inp" id="p_real" value="${esc(d.realName || '')}"></label>
-  <label class="f">${T('회원 번호 (선택)', 'Member ID (optional)')}<input class="inp" id="p_no" value="${esc(d.memberNo || '')}" inputmode="numeric"></label>
+  return `<div class="f"><div style="margin-bottom:6px">${T('이름', 'Name')}<span class="req" aria-hidden="true">*</span></div><div class="seg" id="nametabs" style="margin-bottom:8px">${NAME_LANGS.map(([k, ko, en]) => `<button type="button" class="${k === S.nameTab ? 'on' : ''}" data-act="nametab" data-l="${k}">${T(ko, en)}</button>`).join('')}</div>${NAME_LANGS.map(([k, ko, en, ex]) => `<input class="inp" id="p_name_${k}" data-namefield="${k}" style="${k === S.nameTab ? '' : 'display:none'}" value="${esc(names[k] || '')}" placeholder="${T(`${ko} 이름 · 예: ${ex}`, `${en} name · e.g. ${ex}`)}" aria-label="${T(ko + ' 이름', en + ' name')}" aria-required="true">`).join('')}<div class="xs muted" style="margin:6px 0 14px">${T('모임 언어에 맞는 이름이 역할표와 아젠다에 들어가요. 그 언어 이름이 비어 있으면 다른 이름을 써요.', 'Each club shows the name in its own language, or another one if that is empty.')}</div></div>
+  <label class="f">${T('본명', 'Legal name')}<input class="inp" id="p_real" value="${esc(d.realName || '')}"></label>
+  <label class="f">${T('회원 번호', 'Member ID')}<span class="pfx"><span aria-hidden="true">PN-</span><input class="inp" id="p_no" value="${esc(String(d.memberNo || '').replace(/^PN-?/i, ''))}" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="off" placeholder="12345678" aria-label="${T('회원 번호 (PN- 뒤 숫자)', 'Member ID (digits after PN-)')}"></span></label>
   <label class="f">${T('진행 중인 패스웨이', 'Current Pathways path')}<select class="inp" id="p_path"><option value="">${T('선택 안 함', 'None')}</option>${PATHS.map(p => `<option ${d.path === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select></label>
-  <label class="f">${T('현재 레벨', 'Current level')}<select class="inp" id="p_level">${[1, 2, 3, 4, 5].map(l => `<option value="${l}" ${Number(d.level || 1) === l ? 'selected' : ''}>${T('레벨', 'Level')} ${l}</option>`).join('')}</select></label>`;
+  <div class="f" style="margin-bottom:12px"><div style="margin-bottom:6px">${T('현재 레벨', 'Current level')}</div><div class="seg" id="lvltabs" role="radiogroup" aria-label="${T('현재 레벨', 'Current level')}">${[1, 2, 3, 4, 5].map(l => `<button type="button" role="radio" aria-checked="${Number(S.draft.plevel || d.level || 1) === l}" class="${Number(S.draft.plevel || d.level || 1) === l ? 'on' : ''}" data-act="plevel" data-v="${l}">${T('레벨', 'Level')} ${l}</button>`).join('')}</div><input type="hidden" id="p_level" value="${Number(S.draft.plevel || d.level || 1)}"></div>`;
 }
 function clubJoin(first) {
   const mine = myClubIds();
@@ -1391,7 +1397,7 @@ document.addEventListener('click', async e => {
       case 'saveprofile': {
         const names = {}; for (const [k] of NAME_LANGS) { const v = val('p_name_' + k).trim(); if (v) names[k] = v; }
         const name = names.en || names.ko || names.ja || names.zh || ''; if (!name) { toast(T('이름을 하나 이상 입력해 주세요', 'Please enter your name')); return; }
-        const data = { name, names, realName: val('p_real'), memberNo: val('p_no'), path: val('p_path'), level: Number(val('p_level')) || 1, lang: S.lang };
+        const data = { name, names, realName: val('p_real'), memberNo: val('p_no').replace(/\D/g, '') ? 'PN-' + val('p_no').replace(/\D/g, '') : '', path: val('p_path'), level: Number(val('p_level')) || 1, lang: S.lang };
         if (document.getElementById('p_goal')) data.goal = Number(val('p_goal')) || 40;
         if (S.me) await Store.update('people/' + S.uid, data); else await Store.set('people/' + S.uid, { ...data, clubs: [], manual: {} });
         S.me = { ...(S.me || { clubs: [], manual: {} }), ...data };
@@ -1481,6 +1487,7 @@ document.addEventListener('click', async e => {
         await saveFile(name, blob); break;
       }
       case 'growkey': S.growKey = el.dataset.k; render(); break;
+      case 'plevel': { S.draft.plevel = Number(el.dataset.v); const h = document.getElementById('p_level'); if (h) h.value = S.draft.plevel; document.querySelectorAll('#lvltabs button').forEach(b => { const on = Number(b.dataset.v) === S.draft.plevel; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); }); break; }
       case 'nametab': { S.nameTab = el.dataset.l; document.querySelectorAll('#nametabs button').forEach(b => b.classList.toggle('on', b.dataset.l === S.nameTab)); document.querySelectorAll('[data-namefield]').forEach(i => { i.style.display = i.dataset.namefield === S.nameTab ? '' : 'none'; }); const f = document.getElementById('p_name_' + S.nameTab); if (f) f.focus(); break; }
       case 'logyear': S.logYear = Number(el.dataset.y); render(); break;
       case 'reflclub': S.reflClub = c; render(); break;
