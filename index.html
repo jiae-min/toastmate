@@ -170,7 +170,7 @@ div.f{font-size:13px;color:#52525B}
 const $app = document.getElementById('app');
 const S = {
   lang: 'ko', uid: null, isOwner: false, mode: 'local',
-  me: null, meLoaded: false, clubs: {}, members: {}, meetings: {}, events: {}, refl: {},
+  me: null, meLoaded: false, clubs: {}, members: {}, meetings: {}, events: {}, refl: {}, myReqs: {}, clubReqs: {}, invite: {}, reqSeen: new Set(),
   view: 'home', sub: null, curClub: null, sheet: null, toastMsg: '', calMonth: null,
   loading: true, offline: false, pendingRender: false, draft: {}, year: new Date().getFullYear(),
 };
@@ -395,6 +395,9 @@ function writeFail(e) {
   console.warn(e);
   const code = e && e.code; const msg = (e && e.message) || '';
   if (msg.includes('TM_ROLE_TAKEN')) { toast(T('이미 다른 분이 예약한 역할이에요', 'Someone else already has this role')); throw e; }
+  if (msg.includes('TM_BAD_CODE')) { toast(T('초대 코드가 맞지 않아요. 운영진에게 다시 확인해 주세요.', 'That invite code is not valid.')); throw e; }
+  if (msg.includes('TM_REQUESTS_OFF')) { toast(T('이 클럽은 초대 코드로만 가입할 수 있어요', 'This club accepts invite codes only')); throw e; }
+  if (msg.includes('TM_NEED_APPROVAL')) { toast(T('운영진 승인이 필요해요. 가입 요청을 보내 주세요.', 'An officer must approve. Please send a request.')); throw e; }
   if (msg.includes('TM_FINAL')) { toast(T('확정된 모임은 운영진만 고칠 수 있어요', 'Only officers can change a finalized meeting')); throw e; }
   if (msg.includes('TM_OFFICERS_ONLY') || code === '42501') { toast(T('운영진만 할 수 있는 작업이에요', 'Only officers can do this')); throw e; }
   toast(code === 'quota_exceeded' ? T('저장 공간이 가득 찼어요. 오래된 기록을 지워 주세요.', 'Storage is full. Please delete old records.')
@@ -572,6 +575,59 @@ function profileFields(d) {
   <label class="f">${T('진행 중인 패스웨이', 'Current Pathways path')}<select class="inp" id="p_path"><option value="">${T('선택 안 함', 'None')}</option>${PATHS.map(p => `<option ${d.path === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select></label>
   <div class="f" style="margin-bottom:12px"><div style="margin-bottom:6px">${T('현재 레벨', 'Current level')}</div><div class="seg" id="lvltabs" role="radiogroup" aria-label="${T('현재 레벨', 'Current level')}">${[1, 2, 3, 4, 5].map(l => `<button type="button" role="radio" aria-checked="${Number(S.draft.plevel || d.level || 1) === l}" class="${Number(S.draft.plevel || d.level || 1) === l ? 'on' : ''}" data-act="plevel" data-v="${l}">${T('레벨', 'Level')} ${l}</button>`).join('')}</div><input type="hidden" id="p_level" value="${Number(S.draft.plevel || d.level || 1)}"></div>`;
 }
+function joinBtn(id, c) {
+  if (!Store.supa) return `<button class="btn sm" data-act="joinclub" data-c="${id}">${T('연결', 'Join')}</button>`;
+  const st = S.myReqs[id];
+  if (st === 'pending') return `<span class="tag gray" style="flex:none">${T('승인 대기 중', 'Waiting for approval')}</span>`;
+  if (c.acceptRequests === false) return `<span class="tag gray" style="flex:none">${T('초대 코드로만 가입', 'Invite code only')}</span>`;
+  return `${st === 'rejected' ? `<span class="xs red" style="flex:none;margin-right:6px">${T('거절됨', 'Declined')}</span>` : ''}<button class="btn sm" data-act="reqjoin" data-c="${id}">${st === 'rejected' ? T('다시 요청', 'Ask again') : T('가입 요청', 'Request')}</button>`;
+}
+/* join requests: requester side */
+async function loadMyReqs() {
+  if (!Store.supa) return;
+  const { data } = await Store.supa.from('join_requests').select('club_id,status').eq('uid', S.uid);
+  S.myReqs = Object.fromEntries((data || []).map(r => [r.club_id, r.status])); scheduleRender();
+}
+function watchMyReqs() {
+  if (!Store.supa) return; loadMyReqs();
+  Store.supa.channel('tm-myreq-' + uidGen()).on('postgres_changes', { event: '*', schema: 'public', table: 'join_requests', filter: `uid=eq.${S.uid}` }, () => {
+    setTimeout(() => { loadMyReqs(); Store.supaRefresh('people/' + S.uid); }, 300);
+  }).subscribe();
+}
+async function afterJoined(c, msg) {
+  const list = [...new Set([...((S.me && S.me.clubs) || []), c])]; S.me.clubs = list; S.myReqs[c] = 'approved';
+  await Store.update('people/' + S.uid, { clubs: list }).catch(() => {}); subscribeClubs();
+  setTimeout(() => { const mm = myMember(c); if (mm) Store.update(`clubs/${c}/members/${mm.id}`, { name: nameFor(S.me, c), names: namesOf(S.me) }).catch(() => {}); }, 2000);
+  toast(msg); S.curClub = c; S.draft = {}; go('home');
+}
+/* join requests: officer side */
+const reqSubs = {};
+function watchClubReqs(c) {
+  if (!Store.supa || reqSubs[c]) return;
+  const sb = Store.supa;
+  const fire = async () => {
+    const { data } = await sb.from('join_requests').select('uid,name,status,created_at').eq('club_id', c).eq('status', 'pending').order('created_at');
+    S.clubReqs[c] = data || []; scheduleRender(); setTimeout(maybeReqPopup, 0);
+  };
+  fire();
+  let t = null; const ch = sb.channel('tm-req-' + c + '-' + uidGen()).on('postgres_changes', { event: '*', schema: 'public', table: 'join_requests', filter: `club_id=eq.${c}` }, () => { clearTimeout(t); t = setTimeout(fire, 200); }).subscribe();
+  reqSubs[c] = () => sb.removeChannel(ch);
+}
+const pendingReqs = () => myClubIds().filter(c => isOfficer(c)).flatMap(c => (S.clubReqs[c] || []).map(r => ({ ...r, club: c })));
+function maybeReqPopup() {
+  if (S.sheet || S.loading || !S.me) return;
+  const fresh = pendingReqs().filter(r => !S.reqSeen.has(r.club + '/' + r.uid + '/' + r.created_at));
+  if (!fresh.length) return;
+  for (const r of pendingReqs()) S.reqSeen.add(r.club + '/' + r.uid + '/' + r.created_at);
+  S.sheet = reqSheet; scheduleRender();
+}
+const reqRow = r => `<div class="li"><div class="grow" style="min-width:0"><b class="small">${esc(r.name)}</b><div class="xs muted">${esc(clubName(r.club))} · ${shortD(String(r.created_at).slice(0, 10))}</div></div><button class="btn sec sm" style="flex:none" data-act="reqdecide" data-c="${r.club}" data-u="${r.uid}" data-v="0">${T('거부', 'Decline')}</button><button class="btn sm" style="flex:none" data-act="reqdecide" data-c="${r.club}" data-u="${r.uid}" data-v="1">${T('승인', 'Approve')}</button></div>`;
+function reqSheet() {
+  const list = pendingReqs();
+  return `<h2>${T('가입 요청', 'Join requests')}</h2><p class="small muted" style="margin:6px 0 8px">${T('승인하면 바로 클럽 멤버가 돼요. 거부해도 다시 요청할 수 있어요.', 'Approved people join right away. Declined people can ask again.')}</p>
+  ${list.length ? `<div class="list">${list.map(reqRow).join('')}</div>` : `<div class="empty-state">${T('대기 중인 요청이 없어요.', 'No pending requests.')}</div>`}
+  <button class="btn sec block" style="margin-top:12px" data-act="closesheet">${list.length ? T('나중에', 'Later') : T('닫기', 'Close')}</button>`;
+}
 function clubJoin(first) {
   const mine = myClubIds();
   const all = Object.entries(S.clubs).filter(([id]) => !mine.includes(id)).sort((a, b) => (a[1].division || '').localeCompare(b[1].division || '') || String(a[1].area || '').localeCompare(String(b[1].area || ''), undefined, { numeric: true }));
@@ -579,9 +635,10 @@ function clubJoin(first) {
   const list = all.filter(([, c]) => !q || (c.nick + ' ' + c.official).toLowerCase().includes(q));
   const groups = {};
   for (const [id, c] of list) { const k = c.division || '-'; (groups[k] = groups[k] || {}); const a = c.area || '-'; (groups[k][a] = groups[k][a] || []).push([id, c]); }
-  const body = Object.keys(groups).sort().map(dv => `<div class="row" style="margin:14px 0 6px"><b class="small">${T('디비전', 'Division')} ${esc(dv)}</b><span style="flex:1;height:1px;background:#E6E9EB"></span></div>` + Object.keys(groups[dv]).sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true })).map(ar => `<div class="xs muted" style="font-weight:700;margin:6px 4px">${T('에어리어', 'Area')} ${esc(ar)}</div>` + groups[dv][ar].map(([id, c]) => `<div class="row" style="background:#F2F3F5;border-radius:16px;padding:10px 14px;margin-bottom:6px"><div class="grow row wrap" style="gap:6px"><b>${esc(c.nick || c.official)}</b>${(c.langs || []).map(l => `<span class="tag gray">${esc(LANGS[l] ? T(LANGS[l][0], LANGS[l][1]) : l)}</span>`).join('')}</div><button class="btn sm" data-act="joinclub" data-c="${id}">${T('연결', 'Join')}</button></div>`).join('')).join('')).join('');
-  return `${first ? `${langBar()}<div class="top" style="padding-top:12px"><div><h1>${T('활동 중인 클럽을 연결해 주세요', 'Connect your clubs')}</h1><div class="small muted">${T('여러 클럽을 함께 연결할 수 있어요.', 'You can join more than one club.')}</div></div></div>` : topbar(T('클럽 연결', 'Join a club'), '')}
-  <div class="card"><label class="f">${T('클럽 검색', 'Search clubs')}<input class="inp" id="clubq" data-live="1" data-act-input="clubq" value="${esc(S.draft.clubq || '')}" placeholder="${T('클럽 이름', 'Club name')}"></label>
+  const body = Object.keys(groups).sort().map(dv => `<div class="row" style="margin:14px 0 6px"><b class="small">${T('디비전', 'Division')} ${esc(dv)}</b><span style="flex:1;height:1px;background:#E6E9EB"></span></div>` + Object.keys(groups[dv]).sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true })).map(ar => `<div class="xs muted" style="font-weight:700;margin:6px 4px">${T('에어리어', 'Area')} ${esc(ar)}</div>` + groups[dv][ar].map(([id, c]) => `<div class="row" style="background:#F2F3F5;border-radius:16px;padding:10px 14px;margin-bottom:6px"><div class="grow row wrap" style="gap:6px"><b>${esc(c.nick || c.official)}</b>${(c.langs || []).map(l => `<span class="tag gray">${esc(LANGS[l] ? T(LANGS[l][0], LANGS[l][1]) : l)}</span>`).join('')}</div>${joinBtn(id, c)}</div>`).join('')).join('')).join('');
+  return `${first ? `${langBar()}<div class="top" style="padding-top:12px"><div><h1>${T('활동 중인 클럽을 연결해 주세요', 'Connect your clubs')}</h1><div class="small muted">${Store.supa ? T('초대 코드를 입력하거나, 클럽에 가입 요청을 보내 주세요. 운영진이 승인하면 연결돼요.', 'Enter an invite code, or send a join request. You are in once an officer approves.') : T('여러 클럽을 함께 연결할 수 있어요.', 'You can join more than one club.')}</div></div></div>` : topbar(T('클럽 연결', 'Join a club'), '')}
+  ${Store.supa ? `<div class="card"><h2 style="margin-bottom:4px">${T('초대 코드로 가입', 'Join with an invite code')}</h2><p class="xs muted" style="margin:0 0 10px">${T('클럽 운영진에게 받은 8자리 코드를 입력하면 바로 연결돼요.', 'Enter the 8-character code from a club officer to join right away.')}</p><div class="row"><input class="inp" id="invcode" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="${T('예: 3F9A1C7B', 'e.g. 3F9A1C7B')}" style="text-transform:uppercase;letter-spacing:2px"><button class="btn" style="flex:none" data-act="joincode">${T('가입', 'Join')}</button></div></div>` : ''}
+  <div class="card">${Store.supa ? `<h2 style="margin-bottom:10px">${T('가입 요청 보내기', 'Request to join')}</h2>` : ''}<label class="f">${T('클럽 검색', 'Search clubs')}<input class="inp" id="clubq" data-live="1" data-act-input="clubq" value="${esc(S.draft.clubq || '')}" placeholder="${T('클럽 이름', 'Club name')}"></label>
   <div class="row between"><b class="blue">${T('한국 토스트마스터즈', 'Korean Toastmasters')}</b><span class="xs muted">${T('디스트릭트 93', 'District 93')}</span></div>
   ${body || `<div class="empty-state">${all.length ? T('검색 결과가 없어요.', 'No matches.') : T('아직 등록된 클럽이 없어요.', 'No clubs yet.')}</div>`}
   <button class="btn sec block" style="margin-top:12px" data-act="go" data-v="clubnew">${T('+ 새 클럽 등록하기', '+ Register a new club')}</button></div>`;
@@ -1319,12 +1376,21 @@ function vSettings() {
   return `${topbar(T('설정', 'Settings'), '', false)}
   <div class="card"><div class="row between"><h2>${T('언어', 'Language')}</h2><div class="seg" style="width:200px"><button class="${S.lang === 'ko' ? 'on' : ''}" data-act="lang" data-l="ko">한국어</button><button class="${S.lang === 'en' ? 'on' : ''}" data-act="lang" data-l="en">English</button></div></div></div>
   <div class="card mobonly-pc"><div class="row between"><div><h2>${esc(S.me.name)}</h2><div class="xs muted">${esc([S.me.realName, S.me.memberNo, S.me.path, S.me.path ? T('레벨', 'Level') + ' ' + (S.me.level || 1) : ''].filter(Boolean).join(' · '))}</div></div><button class="btn sec sm" data-act="go" data-v="profile">${T('수정', 'Edit')}</button></div></div>
-  <div class="card"><h2 style="margin-bottom:6px">${T('내 클럽', 'My clubs')}</h2><div class="list">${ids.map(c => { const cl = S.clubs[c]; const mm = myMember(c); return `<div class="li"><div class="grow"><b>${esc(clubName(c))}</b><div class="xs muted">${esc([cl.area && T('에어리어', 'Area') + ' ' + cl.area, cl.division && T('디비전', 'Division') + ' ' + cl.division, mm && mm.position].filter(Boolean).join(' · '))}</div></div>${isOfficer(c) ? `<button class="ibtn tool" data-act="openclubset" data-c="${c}" aria-label="${T('클럽 설정', 'Club settings')}">${IC.settings}</button>` : ''}<button class="ibtn tool" style="background:#F5E9EB;color:#772432" data-act="leaveask" data-c="${c}" aria-label="${T('나가기', 'Leave')}">${IC.exit}</button></div>`; }).join('')}</div><button class="btn tint block" style="margin-top:10px;min-height:44px;font-size:14px" data-act="go" data-v="clubjoin">${T('+ 클럽 추가', '+ Add a club')}</button></div>
+  <div class="card"><h2 style="margin-bottom:6px">${T('내 클럽', 'My clubs')}</h2><div class="list">${ids.map(c => { const cl = S.clubs[c]; const mm = myMember(c); return `<div class="li"><div class="grow"><b>${esc(clubName(c))}</b>${isOfficer(c) && (S.clubReqs[c] || []).length ? `<span class="tag red" style="margin-left:6px">${T('가입 요청', 'Requests')} ${(S.clubReqs[c] || []).length}</span>` : ''}<div class="xs muted">${esc([cl.area && T('에어리어', 'Area') + ' ' + cl.area, cl.division && T('디비전', 'Division') + ' ' + cl.division, mm && mm.position].filter(Boolean).join(' · '))}</div></div>${isOfficer(c) ? `<button class="ibtn tool" data-act="openclubset" data-c="${c}" aria-label="${T('클럽 설정', 'Club settings')}">${IC.settings}</button>` : ''}<button class="ibtn tool" style="background:#F5E9EB;color:#772432" data-act="leaveask" data-c="${c}" aria-label="${T('나가기', 'Leave')}">${IC.exit}</button></div>`; }).join('')}</div><button class="btn tint block" style="margin-top:10px;min-height:44px;font-size:14px" data-act="go" data-v="clubjoin">${T('+ 클럽 추가', '+ Add a club')}</button></div>
   <div class="card"><h3>${T('데이터', 'Data')}</h3><p class="small muted" style="margin:6px 0 0">${S.mode === 'supa' ? T('클럽 데이터는 같은 클럽 멤버끼리만 보여요. "오늘의 나" 기록은 나만 볼 수 있어요.', 'Club data is visible only to members of the same club. Reflections are private to you.') : S.mode === 'shared' ? T('claude.ai 계정으로 로그인되어 있고, 클럽 데이터는 이 페이지를 공유받은 사람들과 함께 쓰여요. "오늘의 나" 기록은 나만 볼 수 있어요.', 'Signed in with claude.ai. Club data is shared with people who can open this page. Reflections are private to you.') : T('지금은 이 브라우저에만 저장돼요. 다른 기기나 멤버와는 공유되지 않아요.', 'Saved in this browser only, not shared with other devices or members.')}</p>${S.mode === 'supa' ? `<div class="row end" style="margin-top:12px;gap:8px"><a class="btn sec sm" href="privacy.html" target="_blank" rel="noopener">${T('개인정보 처리방침', 'Privacy policy')}</a><button class="btn sec sm" data-act="logout">${T('로그아웃', 'Sign out')}</button></div>` : ''}${isAppOwner() ? `<div class="row between" style="margin-top:14px;gap:10px"><span class="small">${T('예시 데이터로 둘러보기', 'Explore with example data')}<span class="xs muted"> · ${T('저장되지 않아요', 'nothing is saved')}</span></span><div class="seg" style="width:120px;flex:none"><button class="${S.demo ? '' : 'on'}" data-act="demo" data-v="0">${T('끔', 'Off')}</button><button class="${S.demo ? 'on' : ''}" data-act="demo" data-v="1">${T('켬', 'On')}</button></div></div>` : ''}</div>
   <div class="card"><h3 class="red">${T('탈퇴', 'Delete account')}</h3><p class="small muted" style="margin:6px 0 12px">${T('내 정보와 복기 기록이 지워지고, 모든 클럽에서 나가요. 클럽 모임에 남은 역할 기록은 이름만 남아요. 되돌릴 수 없어요.', 'Your profile and reflections are deleted and you leave every club. Past meeting roles keep only your name. This cannot be undone.')}</p><button class="btn block" style="background:#F5E9EB;color:#772432" data-act="deleteask">${T('탈퇴하기', 'Delete my account')}</button></div>`;
 }
 function vProfile() {
   return `${topbar(T('내 정보', 'My profile'), '')}<div class="card">${profileFields(S.me)}<label class="f">${T('연간 역할 목표', 'Yearly role goal')}<input class="inp" id="p_goal" type="number" value="${esc(S.me.goal || 40)}"></label><button class="btn block" data-act="saveprofile">${T('저장', 'Save')}</button></div>`;
+}
+function joinSettingsCard(c, cl) {
+  const reqs = (S.clubReqs[c] || []).map(r => ({ ...r, club: c })); const on = cl.acceptRequests !== false;
+  return `<div class="card"><h2 style="margin-bottom:4px">${T('가입 방법', 'How people join')}</h2><p class="xs muted" style="margin:0 0 12px">${T('초대 코드를 받은 사람, 또는 운영진이 가입 요청을 승인한 사람만 클럽에 들어올 수 있어요.', 'Only people with the invite code, or whose request an officer approves, can join.')}</p>
+  <div class="row between" style="margin-bottom:6px"><b class="small">${T('초대 코드', 'Invite code')}</b>${S.invite[c] ? `<div class="row" style="gap:6px"><b class="blue" style="font-size:18px;letter-spacing:2px">${esc(S.invite[c])}</b><button class="btn sec sm" data-act="invcopy" data-c="${c}">${T('복사', 'Copy')}</button><button class="btn sec sm" data-act="invreset" data-c="${c}">${T('새 코드', 'New code')}</button></div>` : `<button class="btn sec sm" data-act="invshow" data-c="${c}">${T('코드 보기', 'Show code')}</button>`}</div>
+  <p class="xs muted" style="margin:0 0 14px">${T('코드가 밖으로 퍼졌다면 새 코드를 만들어 주세요. 예전 코드는 바로 막혀요.', 'If the code leaks, make a new one. The old code stops working at once.')}</p>
+  <div class="row between" style="margin-bottom:10px"><b class="small">${T('가입 요청 받기', 'Accept join requests')}</b><div class="seg" style="width:140px;flex:none"><button class="${on ? 'on' : ''}" data-act="reqtoggle" data-c="${c}" data-v="1">${T('켬', 'On')}</button><button class="${on ? '' : 'on'}" data-act="reqtoggle" data-c="${c}" data-v="0">${T('끔', 'Off')}</button></div></div>
+  <b class="small">${T('대기 중인 요청', 'Pending requests')} ${reqs.length ? `<span class="tag red" style="margin-left:4px">${reqs.length}</span>` : ''}</b>
+  ${reqs.length ? `<div class="list">${reqs.map(reqRow).join('')}</div>` : `<p class="xs muted" style="margin:6px 0 0">${T('대기 중인 요청이 없어요.', 'No pending requests.')}</p>`}</div>`;
 }
 function vClubSettings() {
   const { c } = S.sub || {}; const cl = S.clubs[c]; if (!cl) return topbar('', '');
@@ -1338,6 +1404,7 @@ function vClubSettings() {
   <p class="xs muted">${T('클럽 미션은 클럽 언어에 맞춰 아젠다에 자동으로 들어가요. 로고를 따로 올리지 않으면 토스트마스터즈 로고가 들어가요.', 'The club mission is added automatically in the club language. The Toastmasters logo is used on agendas.')}</p>
   <div class="row end"><button class="btn" data-act="saveclub" data-c="${c}">${T('저장', 'Save')}</button></div></div>
   ${(() => { if (!S.draft.flow) S.draft.flow = clone(cl.flow && cl.flow.length ? cl.flow : DEFAULT_FLOW()); const ed = flowEditor(S.draft.flow, null, cl.start || '19:30', (cl.langs || ['ko'])[0] === 'en' ? 'en' : 'ko'); return `<div class="card"><h2>${T('아젠다 템플릿', 'Agenda template')}</h2><p class="xs muted" style="margin:4px 0 8px">${T('새 모임을 등록할 때 이 순서가 기본으로 들어가요. ≡를 꾹 눌러 위아래로 옮겨요. 연설·평가 세션 시간은 모임마다 발표자 수에 맞춰 자동 계산돼요.', 'New meetings start with this order. Press and hold ≡ to move. Speech and evaluation times adjust to each meeting.')} ${T('종료 예정', 'Ends at')} <b class="blue">${ed.end}</b></p>${ed.html}<div class="row end" style="margin-top:14px"><button class="btn" data-act="flowsave" data-c="${c}" data-template="1">${T('템플릿 저장', 'Save template')}</button></div></div>`; })()}
+  ${Store.supa ? joinSettingsCard(c, cl) : ''}
   <div class="card"><h2 style="margin-bottom:4px">${T('멤버 · 운영진', 'Members & officers')}</h2><p class="xs muted" style="margin:0 0 8px">${T('운영진은 모임 등록, 텍스트 입력, 아젠다 확정을 할 수 있어요. 앱을 쓰지 않는 멤버도 이름을 등록해 두면 역할에 배정할 수 있어요.', 'Officers can add meetings, paste roles and finalize. Add members who do not use the app so you can assign them roles.')}</p>
   <div class="list">${ms.map(mm => `<div class="li"><div class="grow"><b class="small">${esc(mm.name)}</b>${mm.uid ? `<span class="tag" style="margin-left:6px">${T('앱 사용', 'In app')}</span>` : ''}<div class="xs muted">${esc(mm.position || (mm.officer ? T('운영진', 'Officer') : T('멤버', 'Member')))}</div></div><button class="btn ${mm.officer ? 'tint' : 'sec'} sm" data-act="memedit" data-c="${c}" data-id="${mm.id}">${IC.pen}</button></div>`).join('')}</div>
   <div class="row" style="margin-top:10px"><input class="inp" id="newmem" placeholder="${T('멤버 이름 (영어 이름)', 'Member name')}"><button class="btn" data-act="addmem" data-c="${c}">${T('추가', 'Add')}</button></div></div>`;
@@ -1494,6 +1561,37 @@ document.addEventListener('click', async e => {
         await saveFile(name, blob); break;
       }
       case 'growkey': S.growKey = el.dataset.k; render(); break;
+      case 'reqjoin': {
+        el.disabled = true;
+        const { data, error } = await Store.supa.rpc('tm_request_join', { p_club: c, p_name: nameFor(S.me, c) });
+        if (error) { el.disabled = false; return writeFail(error); }
+        if (data === 'joined') { await afterJoined(c, T('클럽을 연결했어요', 'Club joined')); break; }
+        S.myReqs[c] = 'pending'; toast(T('가입 요청을 보냈어요. 운영진이 승인하면 연결돼요.', 'Request sent. You will be in once an officer approves.')); render(); break;
+      }
+      case 'joincode': {
+        const code = val('invcode'); if (!code) { toast(T('초대 코드를 입력해 주세요', 'Please enter the invite code')); return; }
+        el.disabled = true;
+        const { data, error } = await Store.supa.rpc('tm_join_with_code', { p_code: code, p_name: nameFor(S.me, null) });
+        if (error) { el.disabled = false; return writeFail(error); }
+        if (!S.clubs[data]) await new Promise(r => setTimeout(r, 600));
+        await afterJoined(data, T('초대 코드로 클럽에 가입했어요', 'Joined with the invite code')); break;
+      }
+      case 'reqdecide': {
+        const ok = el.dataset.v === '1'; const u = el.dataset.u;
+        el.closest('.li').querySelectorAll('button').forEach(b => b.disabled = true);
+        const { error } = await Store.supa.rpc('tm_decide_request', { p_club: c, p_uid: u, p_approve: ok });
+        if (error) { el.closest('.li').querySelectorAll('button').forEach(b => b.disabled = false); return writeFail(error); }
+        S.clubReqs[c] = (S.clubReqs[c] || []).filter(r => r.uid !== u);
+        toast(ok ? T('승인했어요', 'Approved') : T('거부했어요', 'Declined')); render(); break;
+      }
+      case 'reqtoggle': await Store.update('clubs/' + c, { acceptRequests: el.dataset.v === '1' }); toast(T('저장했어요', 'Saved')); break;
+      case 'invshow': case 'invreset': {
+        if (a === 'invreset' && !confirm(T('새 코드를 만들면 지금 코드는 더 이상 쓸 수 없어요. 계속할까요?', 'The current code will stop working. Continue?'))) return;
+        const { data, error } = await Store.supa.rpc('tm_invite_code', { p_club: c, p_reset: a === 'invreset' });
+        if (error) return writeFail(error);
+        S.invite[c] = data; if (a === 'invreset') toast(T('새 초대 코드를 만들었어요', 'New invite code made')); render(); break;
+      }
+      case 'invcopy': { try { await navigator.clipboard.writeText(S.invite[c] || ''); toast(T('복사했어요', 'Copied')); } catch (x) { toast(S.invite[c] || ''); } break; }
       case 'plevel': { S.draft.plevel = Number(el.dataset.v); const h = document.getElementById('p_level'); if (h) h.value = S.draft.plevel; document.querySelectorAll('#lvltabs button').forEach(b => { const on = Number(b.dataset.v) === S.draft.plevel; b.classList.toggle('on', on); b.setAttribute('aria-checked', on); }); break; }
       case 'nametab': { S.nameTab = el.dataset.l; document.querySelectorAll('#nametabs button').forEach(b => b.classList.toggle('on', b.dataset.l === S.nameTab)); document.querySelectorAll('[data-namefield]').forEach(i => { i.style.display = i.dataset.namefield === S.nameTab ? '' : 'none'; }); const f = document.getElementById('p_name_' + S.nameTab); if (f) f.focus(); break; }
       case 'logyear': S.logYear = Number(el.dataset.y); render(); break;
@@ -1645,9 +1743,10 @@ function afterRender() {
 const clubSubs = {};
 function subscribeClubs() {
   for (const c of (S.me && S.me.clubs) || []) {
+    watchClubReqs(c);
     if (clubSubs[c]) continue;
     clubSubs[c] = [
-      Store.onCol(`clubs/${c}/members`, docs => { S.members[c] = Object.fromEntries(docs.map(d => [d.id, d])); scheduleRender(); }),
+      Store.onCol(`clubs/${c}/members`, docs => { S.members[c] = Object.fromEntries(docs.map(d => [d.id, d])); scheduleRender(); setTimeout(maybeReqPopup, 0); }),
       Store.onCol(`clubs/${c}/meetings`, docs => { S.meetings[c] = Object.fromEntries(docs.map(d => [d.id, d])); scheduleRender(); }),
     ];
   }
@@ -1672,6 +1771,7 @@ async function boot() {
   const done = () => { if (gotMe && gotClubs) { clearTimeout(loadTimer); S.loading = false; scheduleRender(); } };
   Store.onDoc('people/' + S.uid, d => { S.me = d; if (d && d.lang && !gotMe) { S.lang = d.lang; } gotMe = true; subscribeClubs(); done(); scheduleRender(); });
   Store.onCol('clubs', docs => { S.clubs = Object.fromEntries(docs.map(d => [d.id, d])); gotClubs = true; done(); scheduleRender(); });
+  watchMyReqs();
   Store.onCol('events', docs => { S.events = Object.fromEntries(docs.map(d => [d.id, d])); scheduleRender(); });
   Store.onCol('data/users/' + S.uid, docs => { S.refl = Object.fromEntries(docs.map(d => [d.id, d])); scheduleRender(); });
   window.addEventListener('hashchange', () => { const h2 = (location.hash || '').slice(1); if (['home', 'meetings', 'log', 'summary', 'settings'].includes(h2) && h2 !== S.view) go(h2); });
