@@ -39,7 +39,7 @@ textarea.inp{padding:12px 14px;min-height:220px;line-height:1.5;resize:vertical}
 label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;color:#52525B;margin-bottom:12px}
 div.f{font-size:13px;color:#52525B}
 .reqban{background:#FBF6D9;margin-top:4px}
-.reqban .list>.li{border-color:#EFE3A8}
+.reqban .li{display:flex;align-items:center;gap:8px;min-height:48px;padding:4px 0}
 .reqdot{flex:none;min-width:28px;height:28px;padding:0 8px;border-radius:14px;background:#772432;color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
 .mrow{display:flex;align-items:center;gap:10px;min-height:48px;padding:2px 0}
 .mhead{font-weight:700;margin:6px 0 2px}
@@ -297,8 +297,9 @@ function demoSeed() {
 const Store = {
   db: null, local: null, listeners: [], supa: null,
   async init() {
-    if (DEMO_ON) { S.mode = 'local'; S.demo = true; this.local = demoSeed(); S.uid = 'demo-me'; S.isOwner = true; return; }
     const cfg = window.TOASTMATE_CONFIG || {};
+    // Example data: anyone in local mode; with Supabase only for accounts listed in config.js ownerIds
+    if (DEMO_ON && !(cfg.supabaseUrl && cfg.supabaseAnonKey)) { S.mode = 'local'; S.demo = true; this.local = demoSeed(); S.uid = 'demo-me'; S.isOwner = true; return; }
     if (cfg.supabaseUrl && cfg.supabaseAnonKey) {
       try {
         if (!window.supabase) await loadScript('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2');
@@ -306,7 +307,11 @@ const Store = {
         SUPA.client = client; this.supa = client; S.mode = 'supa'; S.isOwner = false;
         const { data } = await client.auth.getSession();
         client.auth.onAuthStateChange((ev, session) => { if ((ev === 'SIGNED_IN' && !S.uid) || ev === 'SIGNED_OUT') location.replace(location.pathname); });
-        if (!data.session) { S.needLogin = true; return; }
+        if (!data.session) { try { sessionStorage.removeItem('toastmate-demo'); } catch (e) {} S.needLogin = true; return; }
+        if (DEMO_ON) {
+          if ((cfg.ownerIds || []).includes(data.session.user.id)) { SUPA.user = data.session.user; this.supa = null; S.mode = 'local'; S.demo = true; this.local = demoSeed(); S.uid = 'demo-me'; S.isOwner = true; return; }
+          try { sessionStorage.removeItem('toastmate-demo'); } catch (e) {}
+        }
         SUPA.user = data.session.user; S.uid = data.session.user.id;
         try { const r = await client.rpc('tm_is_district_admin'); S.districtAdmin = !!(r && r.data); } catch (e) {}
         if (location.search.includes('code=')) history.replaceState(null, '', location.pathname + location.hash);
@@ -632,9 +637,9 @@ function watchClubReqs(c) {
 const pendingReqs = () => myClubIds().filter(c => isOfficer(c)).flatMap(c => (S.clubReqs[c] || []).map(r => ({ ...r, club: c })));
 function reqBanner() {
   const list = pendingReqs(); if (!list.length) return '';
-  return `<div class="card reqban"><div class="row" style="gap:10px;margin-bottom:4px"><span class="reqdot" aria-label="${list.length}">!</span><div class="grow" style="min-width:0"><b>${T('새 가입 요청이 있어요', 'New join requests')}</b><div class="xs muted">${T('승인하면 바로 클럽 멤버가 돼요. 거부해도 다시 요청할 수 있어요.', 'Approved people join right away. Declined people can ask again.')}</div></div></div><div class="list">${list.map(reqRow).join('')}</div></div>`;
+  return `<div class="card reqban"><div class="row" style="gap:10px;margin-bottom:4px"><span class="reqdot" aria-label="${list.length}">!</span><b class="grow">${T('새 가입 요청이 있어요', 'New join requests')}</b></div><div>${list.map(reqRow).join('')}</div></div>`;
 }
-const reqRow = r => `<div class="li"><div class="grow" style="min-width:0"><b class="small">${esc(r.name)}</b><div class="xs muted">${esc(clubName(r.club))} · ${shortD(String(r.created_at).slice(0, 10))}</div></div><button class="btn sec sm" style="flex:none" data-act="reqdecide" data-c="${r.club}" data-u="${r.uid}" data-v="0">${T('거부', 'Decline')}</button><button class="btn sm" style="flex:none" data-act="reqdecide" data-c="${r.club}" data-u="${r.uid}" data-v="1">${T('승인', 'Approve')}</button></div>`;
+const reqRow = r => `<div class="li"><div class="grow row wrap" style="min-width:0;gap:2px 8px;align-items:baseline"><b class="small">${esc(r.name)}</b><span class="xs muted">${esc(clubName(r.club))} · ${shortD(String(r.created_at).slice(0, 10))}</span></div><button class="btn sec sm" style="flex:none" data-act="reqdecide" data-c="${r.club}" data-u="${r.uid}" data-v="0">${T('거부', 'Decline')}</button><button class="btn sm" style="flex:none" data-act="reqdecide" data-c="${r.club}" data-u="${r.uid}" data-v="1">${T('승인', 'Approve')}</button></div>`;
 function clubJoin(first) {
   const mine = myClubIds();
   const all = Object.entries(S.clubs).filter(([id]) => !mine.includes(id)).sort((a, b) => (a[1].division || '').localeCompare(b[1].division || '') || String(a[1].area || '').localeCompare(String(b[1].area || ''), undefined, { numeric: true }));
