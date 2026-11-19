@@ -512,8 +512,8 @@ function logoSvg(size) {
 function loginPage() {
   return `<div class="main">${langBar()}<div style="padding:12vh 16px 0;text-align:center">${logoSvg(76)}<h1 class="blue" style="font-size:30px;margin-top:14px">ToastMate</h1><p class="small muted" style="margin:6px 0 32px">${T('역할 예약부터 아젠다, 한 해 결산까지', 'From role booking to agendas and your year in review')}</p>
   <div class="col" style="max-width:360px;margin:0 auto;gap:10px">
-  <button class="btn block" style="background:#FEE500;color:rgba(0,0,0,.85)" data-act="login" data-p="kakao"><img src="assets/kakao-login.png" width="22" height="22" alt="" style="border-radius:5px">${T('카카오로 시작하기', 'Continue with Kakao')}</button>
-  <button class="btn block" style="background:#fff;color:#18181B" data-act="login" data-p="google"><img src="assets/google-login.png" width="20" height="20" alt="">${T('Google로 시작하기', 'Continue with Google')}</button>
+  <button class="btn block" style="background:#FEE500;color:rgba(0,0,0,.85)" data-act="login" data-p="kakao"><img src="assets/kakao-login.png" width="22" height="22" alt="" style="border-radius:5px">${T('카카오로 시작하기', 'Sign in with Kakao')}</button>
+  <button class="btn block" style="background:#fff;color:#18181B" data-act="login" data-p="google"><img src="assets/google-login.png" width="20" height="20" alt="">${T('Google로 시작하기', 'Sign in with Google')}</button>
   ${S.supaError ? `<p class="xs red">${T('로그인 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.', 'Could not reach the sign-in server. Please try again.')}</p>` : ''}
   <p class="xs muted" style="margin-top:14px">${T('로그인하면 ToastMate의 개인정보 처리방침에 동의하게 돼요.', 'By signing in you agree to the ToastMate privacy policy.')} <a href="privacy.html" target="_blank" rel="noopener">${T('개인정보 처리방침', 'Privacy policy')}</a></p></div></div></div>`;
 }
