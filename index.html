@@ -137,7 +137,7 @@ div.f{font-size:13px;color:#52525B}
 .kpi{padding:4px 2px}
 .hm{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px}
 .hm span{aspect-ratio:1/1;border-radius:5px;background:#F2F3F5}
-.hm span.l1{background:#7FA3B8}.hm span.l2{background:#004165}
+.hm span.l1{background:#CFE0EC}.hm span.l2{background:#9DBDD4}.hm span.l3{background:#5E8FB2}.hm span.l4{background:#28658E}.hm span.l5{background:#004165}
 .hm .ml{aspect-ratio:auto;background:none;text-align:center;font-size:10.5px;color:#52525B;padding-top:4px}
 .kpi b{font-family:Montserrat,sans-serif;font-size:24px;color:#004165}
 .bar{height:8px;border-radius:4px;background:#E6E9EB;overflow:hidden}
@@ -1293,6 +1293,26 @@ function smoothPath(pts) {
   for (let i = 0; i < n - 1; i++) { const h = dx[i] / 3; d += ` C${pts[i][0] + h},${pts[i][1] + t[i] * h} ${pts[i + 1][0] - h},${pts[i + 1][1] - t[i + 1] * h} ${pts[i + 1][0]},${pts[i + 1][1]}`; }
   return d;
 }
+function growthCompare(refl, key, head, seg) {
+  const yNow = new Date().getFullYear(), yPrev = yNow - 1; const single = key !== 'all'; const meas = single ? GROWTH.filter(g => g.id === key) : GROWTH;
+  const f1 = x => (Math.round(x * 10) / 10).toFixed(1);
+  const scoreOf = r => { const vs = meas.map(g => { const v = qScore(r.answers, g.id); return v == null ? null : single ? v : (v - 1) / (QMAX[g.id] - 1) * 100; }).filter(v => v != null); return vs.length ? vs.reduce((x, y) => x + y, 0) / vs.length : null; };
+  const nowCol = single ? meas[0].color : '#004165'; const prevCol = '#A9B2B1';
+  const ser = [[yPrev, prevCol, true], [yNow, nowCol, false]].map(([y, col, dash]) => { const by = {}; for (const r of refl) { if (!(r.date || '').startsWith(String(y))) continue; const v = scoreOf(r); if (v == null) continue; const mo = Number(r.date.slice(5, 7)) - 1; (by[mo] = by[mo] || []).push(v); } return { y, col, dash, by }; });
+  if (!ser.some(x => Object.keys(x.by).length)) return `<div class="card">${head}${seg}<div class="empty-state">${T('복기가 쌓이면 작년과 올해를 비교해 보여 줘요.', 'Reflections show a last-year vs this-year comparison here.')}</div></div>`;
+  const YMAX = single ? QMAX[key] : 100, lo = single ? 1 : 0;
+  const W = 340, H = 170, L = single ? 22 : 34, Rr = 12, Tt = 14, B = 26; const X = i => L + i * (W - L - Rr) / 11; const Y = v => Tt + (1 - (v - lo) / (YMAX - lo)) * (H - Tt - B);
+  const ticks = single ? Array.from({ length: YMAX }, (_, i) => i + 1) : [0, 50, 100];
+  let g = ''; for (const t of ticks) g += `<line x1="${L}" x2="${W - Rr}" y1="${Y(t)}" y2="${Y(t)}" stroke="#D5DADA" stroke-dasharray="3 3"/><text x="${L - 7}" y="${Y(t) + 4}" font-size="10" fill="#A9B2B1" text-anchor="end">${single ? t : t + '%'}</text>`;
+  for (const x of ser) {
+    const xy = Array.from({ length: 12 }, (_, mo) => mo).filter(mo => x.by[mo]).map(mo => { const v = x.by[mo].reduce((p, q) => p + q, 0) / x.by[mo].length; return [X(mo), Y(v), v]; });
+    if (xy.length > 1) g += `<path d="${smoothPath(xy)}" fill="none" stroke="${x.col}" stroke-width="${x.dash ? 2 : 3}" ${x.dash ? 'stroke-dasharray="5 4"' : ''} stroke-linejoin="round" stroke-linecap="round"/>`;
+    xy.forEach((p, i) => { g += `<circle cx="${p[0]}" cy="${p[1]}" r="${i === xy.length - 1 ? 4 : 2.5}" fill="${i === xy.length - 1 ? x.col : '#fff'}" stroke="${x.col}" stroke-width="2"><title>${x.y} · ${MON_EN[Math.round((p[0] - L) / ((W - L - Rr) / 11))]} · ${single ? f1(p[2]) : Math.round(p[2]) + '%'}</title></circle>`; });
+  }
+  for (let mo = 0; mo < 12; mo += 2) g += `<text x="${X(mo)}" y="${H - 6}" font-size="10.5" fill="#52525B" text-anchor="middle">${T(mo + 1 + '월', MON_EN[mo])}</text>`;
+  const legend = `<div class="row wrap xs muted" style="gap:12px;justify-content:flex-end;margin-bottom:4px">${ser.map(x => `<span class="row" style="gap:5px"><i style="width:14px;height:0;border-top:${x.dash ? '2px dashed' : '3px solid'} ${x.col};display:inline-block"></i>${x.y}</span>`).join('')}</div>`;
+  return `<div class="card">${head}${seg}${legend}<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${T('작년과 올해 비교', 'Last year vs this year')}">${g}</svg></div>`;
+}
 function growthCard(refl) {
   const tabs = [{ id: 'all', ko: '전체', en: 'Total' }, ...GROWTH];
   if (!tabs.some(g => g.id === S.growKey)) S.growKey = 'all';
@@ -1301,6 +1321,7 @@ function growthCard(refl) {
   const head = `<div class="row between"><h2>${T('오늘의 나', 'Reflections')} <span class="small muted" style="font-weight:400">${T(`${refl.length}회 기록`, `${refl.length} saved`)}</span></h2>${rs.length ? `<b style="color:#772432">★ ${(rs.reduce((a, b) => a + b, 0) / rs.length).toFixed(1)}</b>` : ''}</div>`;
   const seg = `<div class="segfade" style="margin:12px 0 10px"><div class="segs">${tabs.map(g => `<button class="${g.id === key ? 'on' : ''}" style="font-size:12px;padding:0 10px" data-act="growkey" data-k="${g.id}">${g.color ? `<i style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${g.color};margin-right:4px;vertical-align:1px"></i>` : ''}${T(g.ko, g.en)}</button>`).join('')}</div></div>`;
   const shown = key === 'all' ? GROWTH : GROWTH.filter(g => g.id === key);
+  if (S.year === 'all') return growthCompare(refl, key, head, seg);
   const series = shown.map(g => ({ g, pts: refl.map(r => ({ date: r.date, v: qScore(r.answers, g.id) })).filter(x => x.v != null) }));
   const months = [...new Set(refl.map(r => (r.date || '').slice(0, 7)).filter(Boolean))].sort();
   if (months.length < 2 || !series.some(x => x.pts.length)) return `<div class="card">${head}${seg}<div class="empty-state">${T('두 달 이상 복기가 쌓이면 흐름이 보여요.', 'Reflections from two or more months show your trend here.')}</div></div>`;
@@ -1322,18 +1343,17 @@ function growthCard(refl) {
   g = `<defs>${defs}</defs>` + g + area + lines + dots;
   const step = Math.ceil(months.length / 6); months.forEach((m, i) => { if (i % step && i !== months.length - 1) return; const mo = Number(m.slice(5)); g += `<text x="${X(i)}" y="${H - 6}" font-size="10.5" fill="#52525B" text-anchor="middle">${T(mo + '월', MON_EN[mo - 1])}</text>`; });
   const legend = `<div class="row wrap xs muted" style="gap:12px;justify-content:flex-end;margin-bottom:4px">${shown.map(gg => `<span class="row" style="gap:5px"><i style="width:12px;height:3px;border-radius:2px;background:${gg.color};display:inline-block"></i>${T(gg.ko, gg.en)}</span>`).join('')}</div>`;
-  return `<div class="card">${head}${seg}<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${T('월별 평균 점수', 'Monthly average scores')}">${g}</svg><p class="xs muted" style="margin:6px 0 0">${single ? T(`월별 평균이에요. 가장 낮은 답이 1점, 한 단계 좋아질 때마다 1점씩 더해 ${YMAX}점 만점이에요.`, `Monthly averages. The lowest answer is 1 point, each step up adds 1, out of ${YMAX}.`) : T('자신감은 답이 4개, 나머지는 3개라 전체에서는 가장 낮은 답 0%, 가장 좋은 답 100%로 맞춰 그렸어요.', 'Confidence has 4 answers and the others 3, so Total maps the lowest answer to 0% and the best to 100%.')}</p></div>`;
+  return `<div class="card">${head}${seg}<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${T('월별 평균 점수', 'Monthly average scores')}">${g}</svg><p class="xs muted" style="margin:6px 0 0">${single ? '' : T('자신감은 답이 4개, 나머지는 3개라 전체에서는 가장 낮은 답 0%, 가장 좋은 답 100%로 맞춰 그렸어요.', 'Confidence has 4 answers and the others 3, so Total maps the lowest answer to 0% and the best to 100%.')}</p></div>`;
 }
 function heatmap(yr) {
   if (!yr) return '';
   const wk = {}; // key month-week -> meetings
   const seen = new Set();
-  for (const r of myRecords()) { if (!r.date.startsWith(yr)) continue; const id = r.club + r.meeting.id; if (seen.has(id)) continue; seen.add(id); const d = parseD(r.date); const k = d.getMonth() + '-' + Math.min(4, Math.floor((d.getDate() - 1) / 7)); wk[k] = (wk[k] || 0) + 1; }
+  for (const r of myRecords()) { if (!r.date.startsWith(yr)) continue; const d = parseD(r.date); const k = d.getMonth() + '-' + Math.min(4, Math.floor((d.getDate() - 1) / 7)); wk[k] = (wk[k] || 0) + 1; }
   let cells = '';
-  for (let w = 0; w < 5; w++) for (let mo = 0; mo < 12; mo++) { const n = wk[mo + '-' + w] || 0; cells += `<span class="${n >= 2 ? 'l2' : n ? 'l1' : ''}" title="${T(`${mo + 1}월 ${w + 1}주 · 모임 ${n}회`, `${MON_EN[mo]} week ${w + 1} · ${n} meeting${n === 1 ? '' : 's'}`)}"></span>`; }
+  for (let w = 0; w < 5; w++) for (let mo = 0; mo < 12; mo++) { const n = wk[mo + '-' + w] || 0; cells += `<span class="${n ? 'l' + Math.min(5, n) : ''}" title="${T(`${mo + 1}월 ${w + 1}주 · 역할 ${n}개`, `${MON_EN[mo]} week ${w + 1} · ${n} role${n === 1 ? '' : 's'}`)}"></span>`; }
   for (let mo = 0; mo < 12; mo++) cells += `<span class="ml">${T(mo + 1 + '월', MON_EN[mo])}</span>`;
-  const multi = Object.values(wk).some(n => n > 1);
-  return `<div class="hm" style="margin-top:16px" role="img" aria-label="${T('주별 모임 참여 히트맵', 'Weekly meeting heatmap')}">${cells}</div>${multi ? `<div class="row xs muted" style="gap:10px;justify-content:flex-end;margin-top:8px"><span class="row" style="gap:4px"><i style="width:10px;height:10px;border-radius:3px;background:#F2F3F5;display:inline-block"></i>${T('없음', 'None')}</span><span class="row" style="gap:4px"><i style="width:10px;height:10px;border-radius:3px;background:#7FA3B8;display:inline-block"></i>${T('1회', '1')}</span><span class="row" style="gap:4px"><i style="width:10px;height:10px;border-radius:3px;background:#004165;display:inline-block"></i>${T('2회 이상', '2+')}</span></div>` : ''}`;
+  return `<div class="hm" style="margin-top:16px" role="img" aria-label="${T('주별 모임 참여 히트맵', 'Weekly meeting heatmap')}">${cells}</div>`;
 }
 /* ================= year-end share card ================= */
 const usd = meetMin => Math.round(meetMin / 60 * 20);
@@ -1399,7 +1419,7 @@ function vSummary() {
   return `${topbar('', '', false, `<div class="seg" style="width:220px;max-width:62vw;flex:none">${[new Date().getFullYear() - 1, new Date().getFullYear(), 'all'].map(y => `<button class="${S.year === y ? 'on' : ''}" data-act="year" data-y="${y}">${y === 'all' ? T('전체', 'Total') : y}</button>`).join('')}</div>`)}
   ${!rec.length && !S.demo && isAppOwner() ? `<div class="card" style="background:#FBF6D9"><div class="row between" style="gap:10px"><span class="small">${T('아직 확정된 모임 기록이 없어요. 예시 데이터로 결산 화면을 미리 볼 수 있어요.', 'No finalized meetings yet. Preview this page with example data.')}</span><button class="btn sm" style="flex:none" data-act="demo" data-v="1">${T('예시 보기', 'Show example')}</button></div></div>` : ''}
   <div class="card"><div class="row" style="gap:12px">${logoSvg(48)}<div class="grow"><h2>${esc(S.me.name)}${S.me.realName ? ` <span class="small muted" style="font-weight:400">${esc(S.me.realName)}</span>` : ''}</h2><div class="xs muted">${esc([S.me.path, S.me.path ? T('레벨', 'Level') + ' ' + (S.me.level || 1) : ''].filter(Boolean).join(' · '))}</div></div><button class="ibtn tool" style="flex:none" data-act="wrapped" aria-label="${T('연말 결산 공유', 'Share year in review')}">${IC.share}</button></div></div>
-  <div class="card"><h2 style="margin-bottom:12px">${T('핵심 지표', 'Key metrics')} <span class="small muted" style="font-weight:400">${yrLabel()}</span></h2><div class="two" style="gap:28px 16px;padding:4px 0">${gauge(rec.length, goal, T('역할 수행', 'Roles'), T(`목표 ${goal}회`, `Goal ${goal}`), '#772432')}${gauge(attended.size, finals.length || 0, T('역할 맡은 모임', 'Meetings w/ role'), T(`완료 모임 ${finals.length}회 중`, `of ${finals.length} completed`))}${gauge(types.size, 8, T('역할 다양성', 'Variety'), T('8가지 중', 'of 8 types'))}${gauge(pDone, pAll.length, T('패스웨이 역할', 'Pathways roles'), T(`레벨 ${S.me.level || 1}`, `Level ${S.me.level || 1}`), '#772432')}</div></div>
+  <div class="card"><h2 style="margin-bottom:12px">${T('핵심 지표', 'Key metrics')} <span class="small muted" style="font-weight:400">${yrLabel()}</span></h2><div class="two" style="gap:28px 16px;padding:4px 0">${gauge(rec.length, goal, T('역할 수행', 'Roles'), T('목표', 'Goal'), '#772432')}${gauge(attended.size, finals.length || 0, T('역할 맡은 모임', 'Meetings w/ role'), T('완료 모임', 'completed'))}${gauge(types.size, 8, T('역할 다양성', 'Variety'), T('', 'types'))}${gauge(pDone, pAll.length, T('패스웨이 역할', 'Pathways roles'), T(`레벨 ${S.me.level || 1}`, `Level ${S.me.level || 1}`), '#772432')}</div></div>
   <div class="card"><h2 style="margin-bottom:14px">${T('활동', 'Activity')} <span class="small muted" style="font-weight:400">${T('토스트마스터즈에 투자한 시간', 'Time invested')}</span></h2><div class="grid3" style="gap:10px"><div class="kpi"><div class="xs muted">${T('모임 참여', 'In meetings')}</div><b>${Math.round(meetMin / 6) / 10}</b><span class="xs muted"> ${T('시간', 'h')}</span></div><div class="kpi"><div class="xs muted">${T('직접 말한 시간', 'Speaking')}</div>${speakMin < 60 ? `<b>${speakMin}</b><span class="xs muted"> ${T('분', 'min')}</span>` : `<b>${Math.round(speakMin / 6) / 10}</b><span class="xs muted"> ${T('시간', 'h')}</span>`}</div><div class="kpi"><div class="xs muted">${T('레슨비 환산', 'Lesson value')}</div>${S.lang === 'en' ? `<b>$${usd(meetMin).toLocaleString('en-US')}</b>` : `<b>${won >= 10000 ? Math.round(won / 10000) : won}</b><span class="xs muted"> ${won >= 10000 ? '만원' : '원'}</span>`}</div></div>${heatmap(yr)}
   <p class="xs muted" style="margin:12px 0 0">${T('레슨비는 모임 참여 시간을 스피치 레슨 시간당 3만 원으로 환산했어요. 말한 시간은 역할별 평균 시간으로 추정해요.', 'Lesson value = meeting hours × $20, a typical hourly rate for a group speaking class. Speaking time is estimated per role.')}</p></div>
   ${roleMixCard(false)}
