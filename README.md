@@ -10,9 +10,12 @@
 ## 구조
 
 ```
-index.html              앱 (한 파일)
+index.html              앱 뼈대 (CSS·JS 파일을 불러와요)
+app.js                  앱 기능 (JavaScript)
+styles.css              디자인 (CSS)
 config.js               Supabase 주소와 공개 키 (SETUP.md 참고)
 supabase/schema.sql     데이터베이스 표와 보안 규칙
+supabase/join-requests.sql  가입 요청·초대 코드 (schema.sql에도 포함)
 privacy.html            개인정보 처리방침 초안
 assets/                 로그인·지도 로고, 토스트마스터즈 로고
 brand/                  ToastMate 앱 아이콘 (SVG)
