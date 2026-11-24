@@ -1,0 +1,5 @@
+# GitHub language stats only (no effect on the site).
+# app.js has long lines, so GitHub mistakes it for minified code and skips it.
+app.js linguist-generated=false linguist-detectable=true
+# Design mockups, not the app itself.
+wireframes/** linguist-documentation
