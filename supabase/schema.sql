@@ -573,3 +573,24 @@ end $$;
 
 revoke all on function public.tm_is_app_owner(), public.tm_admin_uids(), public.tm_set_admin(uuid, boolean) from public, anon;
 grant execute on function public.tm_is_app_owner(), public.tm_admin_uids(), public.tm_set_admin(uuid, boolean), public.tm_is_district_admin() to authenticated;
+
+-- Sign-up list for the server owner's admin screen (Settings → 관리자). Owner only.
+create or replace function public.tm_list_users()
+returns table (uid uuid, name text, real_name text, clubs text[], role text, joined_at timestamptz)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if not exists (select 1 from public.app_owners where app_owners.uid = auth.uid()) then raise exception 'TM_NOT_OWNER'; end if;
+  return query
+  select u.id,
+         coalesce(nullif(p.data ->> 'name', ''), ''),
+         coalesce(p.data ->> 'realName', ''),
+         coalesce((select array_agg(coalesce(nullif(c.data ->> 'nick', ''), nullif(c.data ->> 'official', ''), c.id) order by c.id)
+                     from public.members m join public.clubs c on c.id = m.club_id where m.uid = u.id), '{}'),
+         case when exists (select 1 from public.app_owners o where o.uid = u.id) then 'owner'
+              when exists (select 1 from public.district_admins d where d.uid = u.id) then 'admin' else '' end,
+         u.created_at
+    from auth.users u left join public.profiles p on p.id = u.id
+   order by u.created_at;
+end $$;
+revoke all on function public.tm_list_users() from public, anon;
+grant execute on function public.tm_list_users() to authenticated;
