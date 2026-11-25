@@ -17,7 +17,7 @@ config.js               Supabase 주소와 공개 키 (SETUP.md 참고)
 supabase/schema.sql     데이터베이스 표와 보안 규칙
 supabase/join-requests.sql  가입 요청·초대 코드 (schema.sql에도 포함)
 privacy.html            개인정보 처리방침 초안
-assets/                 로그인·지도 로고, 토스트마스터즈 로고
+assets/                 로그인·지도 아이콘
 brand/                  ToastMate 앱 아이콘 (SVG)
 wireframes/             와이어프레임 화면 모음
 .github/workflows/      Supabase 무료 프로젝트 일시정지 방지
@@ -33,6 +33,12 @@ wireframes/             와이어프레임 화면 모음
 - 선 대신 면으로 구분하고, 버튼과 칩은 알약 모양.
 - 글꼴: 영문 제목 Montserrat, 한글 제목 Pretendard Bold, 본문 Pretendard Regular.
 
-## 안내
+## 안내 · Disclaimer
 
-Toastmasters International의 공식 앱이 아니에요. Toastmasters 이름과 로고는 Toastmasters International의 상표이며, 클럽 아젠다의 기본 로고로만 사용합니다.
+ToastMate는 Toastmasters International의 공식 앱이 아니며, 제휴하거나 승인받지 않은 개인 개발 도구입니다. Toastmasters 및 관련 명칭은 Toastmasters International의 상표입니다.
+
+ToastMate is an independent tool and is not an official app of, affiliated with, or endorsed by Toastmasters International. "Toastmasters" and related names are trademarks of Toastmasters International.
+
+- 운영: 민지애(개인) · Operated by Jiae Min (individual)
+- 공식 로고, Pathways 매뉴얼, 공식 평가표 등 Toastmasters International의 자료는 앱에 포함하지 않습니다. 아젠다 로고와 클럽 미션 문구는 각 클럽이 직접 입력합니다.
+- 레벨별 필수 역할 목록은 ToastMate가 직접 요약한 것이며, 정확한 기준은 공식 Base Camp를 따릅니다.
