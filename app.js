@@ -324,7 +324,8 @@ const memberName = (c, entry) => { if (!entry) return ''; const m = entry.mid &&
 const isMine = (c, entry) => { const m = myMember(c); return !!(entry && m && entry.mid === m.id); };
 const meetingsOf = c => Object.values(S.meetings[c] || {}).sort((a, b) => (a.date + (a.start || '')).localeCompare(b.date + (b.start || '')));
 const allMyMeetings = () => myClubIds().flatMap(c => meetingsOf(c).map(m => ({ ...m, club: c })));
-const nextMeeting = c => meetingsOf(c).find(m => m.date >= todayStr()) || null;
+const meetingOver = (c, m, graceMin = 30) => { const cl = S.clubs[c] || {}; const t = m.end || cl.end || addMin(m.start || cl.start || '19:30', 120); const [h, mm] = t.split(':').map(Number); const end = parseD(m.date); end.setHours(h, mm + graceMin, 0, 0); if (t < (m.start || cl.start || '00:00')) end.setDate(end.getDate() + 1); return Date.now() >= end.getTime(); };
+const nextMeeting = c => meetingsOf(c).find(m => m.date >= todayStr() && !meetingOver(c, m)) || null;
 const meetingLabel = (c, m) => `${clubName(c)}${m.no ? ' #' + m.no : ''}`;
 function myRolesIn(c, m) {
   const me = myMember(c); if (!me || !m) return [];
