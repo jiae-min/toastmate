@@ -1658,7 +1658,7 @@ function reflFill() { if (document.activeElement) document.activeElement.blur();
   });
   document.addEventListener('pointermove', e => {
     if (!st) return;
-    if (!st.active) { if (Math.abs(e.clientY - st.y0) > 8) { clear(); st = null; } return; }
+    if (!st.active) { if (Math.abs(e.clientY - st.y0) < 4) return; clear(); st.active = true; st.row.classList.add('dragging'); }
     e.preventDefault();
     st.row.style.transform = '';
     const others = [...st.list.children].filter(r => r !== st.row && r.matches(st.rowSel));
