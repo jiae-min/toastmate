@@ -258,14 +258,15 @@ const ROLES = {
   timer: { ko: '시간지기', en: 'Timer', type: 'timer' }, gram: { ko: '어법지기', en: 'Grammarian', type: 'gram' }, ah: { ko: '어지기', en: 'Ah-Counter', type: 'ah' },
 };
 const ROLE_ORDER = ['tm', 'ge', 'ttm', 'sp1', 'ev1', 'sp2', 'ev2', 'sp3', 'ev3', 'timer', 'gram', 'ah'];
-const TYPES = { dsm: ['토론 세션 진행자', 'Discussion Session Master'], cs: ['세션 진행자', 'Session leader'], tm: ['진행자', 'Toastmaster'], ge: ['총평가자', 'General Evaluator'], ttm: ['주제 질문 세션 진행자', 'Table Topics Master'], sp: ['발표자', 'Speaker'], ev: ['평가자', 'Evaluator'], timer: ['시간지기', 'Timer'], gram: ['어법지기', 'Grammarian'], ah: ['어지기', 'Ah-Counter'], tts: ['주제 질문 발표자', 'Table Topics Speaker'] };
+const TYPES = { dsm: ['토론 세션 진행자', 'Discussion Session Master'], dbm: ['디베이트 세션 진행자', 'Debate Session Master'], cs: ['세션 진행자', 'Session leader'], tm: ['진행자', 'Toastmaster'], ge: ['총평가자', 'General Evaluator'], ttm: ['주제 질문 세션 진행자', 'Table Topics Master'], sp: ['발표자', 'Speaker'], ev: ['평가자', 'Evaluator'], timer: ['시간지기', 'Timer'], gram: ['어법지기', 'Grammarian'], ah: ['어지기', 'Ah-Counter'], tts: ['주제 질문 발표자', 'Table Topics Speaker'] };
 const RADAR_TYPES = ['tm', 'ge', 'ttm', 'sp', 'ev', 'timer', 'gram', 'ah'];
 const sessionsOf = m => (m && Array.isArray(m.sessions) ? m.sessions : [{ id: 'tt', type: 'tt' }]);
-const sessionKey = x => x.type === 'tt' ? 'ttm' : x.type === 'ds' ? 'dsm' : 'cs' + x.id;
-const roleType = k => ROLES[k] ? ROLES[k].type : k === 'dsm' ? 'dsm' : String(k).startsWith('cs') ? 'cs' : k;
+const sessionKey = x => x.type === 'tt' ? 'ttm' : x.type === 'ds' ? 'dsm' : x.type === 'db' ? 'dbm' : 'cs' + x.id;
+const roleType = k => ROLES[k] ? ROLES[k].type : k === 'dsm' ? 'dsm' : k === 'dbm' ? 'dbm' : String(k).startsWith('cs') ? 'cs' : k;
 const roleName = (k, m) => {
   if (ROLES[k]) return T(ROLES[k].ko, ROLES[k].en);
   if (k === 'dsm') return T('토론 세션 진행자', 'Discussion Session Master');
+  if (k === 'dbm') return T('디베이트 세션 진행자', 'Debate Session Master');
   if (String(k).startsWith('cs')) { const x = m && typeof m === 'object' ? sessionsOf(m).find(y => 'cs' + y.id === k) : null; return x && x.title ? T(`${x.title} 진행자`, `${x.title} leader`) : T('세션 진행자', 'Session leader'); }
   return TYPES[k] ? T(TYPES[k][0], TYPES[k][1]) : k;
 };
@@ -302,7 +303,7 @@ const DEFAULT_FLOW = () => [
 const BLOCK = {
   opening: ['개회', 'Opening'], roles: ['역할 소개', 'Meeting roles'], tt: ['주제 질문 세션', 'Table Topics Session'], break: ['쉬는 시간', 'Break'],
   speeches: ['준비 연설 세션', 'Prepared Speech Session'], evaluation: ['평가 세션', 'Evaluation Session'], awards: ['시상 세션', 'Awards Session'], closing: ['폐회', 'Closing'],
-  education: ['교육', 'Education'], ds: ['토론 세션', 'Discussion Session'], qa: ['연설 질의응답', 'Speech Q&A'], custom: ['직접 만든 세션', 'Custom session'],
+  education: ['교육', 'Education'], ds: ['토론 세션', 'Discussion Session'], db: ['디베이트 세션', 'Debate Session'], qa: ['연설 질의응답', 'Speech Q&A'], custom: ['직접 만든 세션', 'Custom session'],
 };
 
 /* ================= derived helpers ================= */
@@ -541,7 +542,7 @@ function vHome() {
 function homeCta(c, m, mine, open) {
   if (m.status === 'final') return '';
   const btn = (label, act, extra = '') => `<button class="btn red block" style="margin-top:16px" data-act="${act}" data-c="${c}" data-m="${m.id}" ${extra}>${label}</button>`;
-  const order = ['tm', 'gram', 'sp1', 'sp2', 'sp3', 'ge', 'ev1', 'ev2', 'ev3', 'ttm', 'dsm', 'timer', 'ah'];
+  const order = ['tm', 'gram', 'sp1', 'sp2', 'sp3', 'ge', 'ev1', 'ev2', 'ev3', 'ttm', 'dsm', 'dbm', 'timer', 'ah'];
   const k = order.find(x => mine.includes(x)) || mine.find(x => String(x).startsWith('cs'));
   if (!k) return open ? btn(T(`빈 역할 ${open}개 중 하나 예약하기`, `Book one of ${open} open roles`), 'openreserve') : btn(T('전체 역할 보기', 'See all roles'), 'openreserve');
   const t = roleType(k), e = m.roles[k] || {};
@@ -656,14 +657,14 @@ function vReserve() {
   };
   const ses = sessionsOf(m);
   const has = t => ses.some(x => x.type === t);
-  const sesLabel = x => x.type === 'tt' ? T('주제 질문 세션', 'Table Topics Session') : x.type === 'ds' ? T('토론 세션', 'Discussion Session') : (x.title || T('세션', 'Session'));
+  const sesLabel = x => x.type === 'tt' ? T('주제 질문 세션', 'Table Topics Session') : x.type === 'ds' ? T('토론 세션', 'Discussion Session') : x.type === 'db' ? T('디베이트 세션', 'Debate Session') : (x.title || T('세션', 'Session'));
   return `${topbar(T('역할 예약하기', 'Book roles'), `${meetingLabel(c, m)} · ${fmtDate(m.date)} ${fmtTime(m.start)}`)}
   ${off ? `<div class="row wrap end offbar" style="gap:6px;padding:0 16px 12px"><button class="btn sec sm" data-act="openpaste" data-c="${c}" data-m="${mid}">${T('텍스트로 입력', 'Paste text')}</button><button class="btn sec sm" data-act="copytext" data-c="${c}" data-m="${mid}">${T('텍스트 반출', 'Copy text')}</button><button class="btn sec sm" data-act="openflow" data-c="${c}" data-m="${mid}">${T('아젠다 플로우', 'Agenda flow')}</button><button class="btn sm" data-act="openexport" data-c="${c}" data-m="${mid}">${T('미리보기 · 내보내기', 'Preview & export')}</button></div>` : ''}
   ${final ? `<div class="card infobox" style="padding:14px 16px;flex-direction:row;align-items:center"><span class="small blue grow">${T('확정된 모임이에요. 기록에 반영됐어요.', 'This meeting is finalized and recorded.')}</span>${off ? `<button class="btn sec sm" data-act="unfinal" data-c="${c}" data-m="${mid}">${T('확정 취소', 'Reopen')}</button>` : ''}</div>` : ''}
   <div class="card"><h2>${T('모임 정보', 'Meeting info')}</h2><div class="list">${field('theme', T('테마', 'Theme'), canTheme)}${field('tq', T('테마 질문', 'Theme question'), canTheme)}${field('wod', T('오늘의 단어', 'Word of the Day'), canWod, 'wodMeaning')}</div></div>
   <div class="card"><h2>${T('진행 · 평가', 'Leaders')}</h2><div class="list">${['tm', 'ge'].map(k => row(k)).join('')}</div></div>
-  <div class="card"><div class="row between wrap" style="gap:8px"><h2>${T('세션', 'Sessions')}</h2>${off && !locked ? `<div class="row wrap end" style="gap:6px"><button class="chip ${has('tt') ? 'on' : ''}" data-act="sesstoggle" data-t="tt" data-c="${c}" data-m="${mid}">${T('주제 질문 세션', 'Table Topics')}</button><button class="chip ${has('ds') ? 'on' : ''}" data-act="sesstoggle" data-t="ds" data-c="${c}" data-m="${mid}">${T('토론 세션', 'Discussion')}</button><button class="chip" data-act="sessadd" data-c="${c}" data-m="${mid}">+ ${T('다른 세션', 'Other')}</button></div>` : ''}</div>
-  <div class="list" style="margin-top:6px">${ses.length ? ses.map(x => `<div class="li" style="flex-wrap:wrap;border:0;padding:6px 0 0;min-height:0"><span class="xs blue grow" style="font-weight:700">${esc(sesLabel(x))}</span>${off && !locked && x.type === 'custom' ? `<button class="xs muted" style="border:0;background:none;cursor:pointer" data-act="sessdel" data-c="${c}" data-m="${mid}" data-id="${esc(x.id)}">${T('삭제', 'Remove')}</button>` : ''}</div>${row(sessionKey(x))}`).join('') : `<div class="empty-state">${T('이번 모임에는 세션이 없어요.', 'No sessions this meeting.')}</div>`}</div></div>
+  <div class="card"><div class="row between wrap" style="gap:8px"><h2>${T('세션', 'Sessions')}</h2>${off && !locked ? `<div class="row wrap end" style="gap:6px"><button class="chip ${has('tt') ? 'on' : ''}" data-act="sesstoggle" data-t="tt" data-c="${c}" data-m="${mid}">${T('주제 질문 세션', 'Table Topics')}</button><button class="chip ${has('ds') ? 'on' : ''}" data-act="sesstoggle" data-t="ds" data-c="${c}" data-m="${mid}">${T('토론 세션', 'Discussion')}</button><button class="chip ${has('db') ? 'on' : ''}" data-act="sesstoggle" data-t="db" data-c="${c}" data-m="${mid}">${T('디베이트 세션', 'Debate')}</button><button class="chip" data-act="sessadd" data-c="${c}" data-m="${mid}">+ ${T('다른 세션', 'Other')}</button></div>` : ''}</div>
+  <div class="list" style="margin-top:6px">${ses.length ? ses.map(x => `<div class="li" style="flex-wrap:wrap;border:0;padding:6px 0 0;min-height:0"><span class="xs blue grow" style="font-weight:700">${esc(sesLabel(x))}</span>${(x.type === 'ds' || x.type === 'db') ? (() => { const tf = x.type + 'Topic'; const can = (off || isMine(c, m.roles && m.roles[sessionKey(x)])) && !locked; return `<div style="flex-basis:100%;display:flex;align-items:center;gap:8px;margin-top:4px"><div class="grow small ${m[tf] ? '' : 'muted'}">${m[tf] ? esc(m[tf]) : T('주제 미정', 'Topic TBD')}</div>${can ? `<button class="ibtn tool" data-act="editfield" data-c="${c}" data-m="${mid}" data-f="${tf}" aria-label="${T('주제 수정', 'Edit topic')}" title="${T('주제 수정', 'Edit topic')}">${IC.pen}</button>` : ''}</div>`; })() : ''}${off && !locked && x.type === 'custom' ? `<button class="xs muted" style="border:0;background:none;cursor:pointer" data-act="sessdel" data-c="${c}" data-m="${mid}" data-id="${esc(x.id)}">${T('삭제', 'Remove')}</button>` : ''}</div>${row(sessionKey(x))}`).join('') : `<div class="empty-state">${T('이번 모임에는 세션이 없어요.', 'No sessions this meeting.')}</div>`}</div></div>
   <div class="card"><h2 style="margin-bottom:4px">${T('연설', 'Speeches')}</h2>${[1, 2, 3].map(n => `<div style="display:flex;gap:12px;padding:6px 0;${n > 1 ? 'border-top:1px solid #E6E9EB' : ''}"><span class="num">${n}</span><div class="grow">${row('sp' + n, typeName('sp'), true)}${row('ev' + n, typeName('ev'), true)}</div></div>`).join('')}</div>
   <div class="card"><h2>${T('기능 역할', 'Functionaries')}</h2><div class="list">${['timer', 'gram', 'ah'].map(k => row(k)).join('')}</div></div>
 `;
@@ -713,6 +714,7 @@ const DICT = [
   ['tq', ['tq', 'themequestion', '테마질문', '주제질문', '오늘의질문']], ['wod', ['wod', 'wordoftheday', '오늘의단어', '오늘의 단어']], ['theme', ['theme', '테마', '주제']],
   ['ttm', ['ttm', 'tabletopicsmaster', 'topicsmaster', 'ttmaster', '주제질문세션진행자', '즉흥연설진행자', '테이블토픽마스터', '테이블토픽진행자', '토픽마스터']],
   ['dsm', ['dsm', 'discussionsessionmaster', 'discussionmaster', '토론세션진행자', '토론진행자']],
+  ['dbm', ['dbm', 'debatesessionmaster', 'debatemaster', 'debatechair', '디베이트세션진행자', '디베이트진행자']],
   ['tts', ['ttspeaker', 'ttspeakers', 'tabletopicsspeaker', 'tabletopicsspeakers', '주제질문발표자', '즉흥연설발표자']],
   ['ge', ['ge', 'g.e', 'generalevaluator', '총평가자', '총평', '총평가']],
   ['tm', ['tm', 'toastmaster', 'toastmasteroftheday', 'tmod', '진행자', '사회자', '토스트마스터']],
@@ -746,7 +748,7 @@ function parsePaste(c, text) {
     if (!k) { out.unknown.push(label.trim()); continue; }
     if (k === 'theme' || k === 'tq') { out.fields[k] = value; continue; }
     if (k === 'wod') { const p = value.split(/\s+[-–·]\s+|\s*\(\s*/); out.fields.wod = (p[0] || '').replace(/\)$/, '').trim(); if (p[1]) out.fields.wodMeaning = p[1].replace(/\)$/, '').trim(); continue; }
-    if (!value) { if (ROLES[k] || k === 'dsm') out.roles[k] = null; continue; }
+    if (!value) { if (ROLES[k] || k === 'dsm' || k === 'dbm') out.roles[k] = null; continue; }
     if (k === 'tts') { for (const nm of value.split(/[,，、/]/).map(s => s.trim()).filter(Boolean)) { const mem = matchMember(c, nm); out.tts.push(mem ? { mid: mem.id } : { name: nm }); } continue; }
     let name = value, title = '';
     if (roleType(k) === 'sp') { const p = value.split(/\s+[-–]\s+|\s+-|-\s+/); name = p[0].trim(); title = p.slice(1).join(' - ').trim(); }
@@ -761,7 +763,7 @@ function vPaste() {
   const { c, m: mid } = S.sub || {}; const m = mid ? getM(c, mid) : null;
   const text = S.draft.paste ?? '';
   const parsed = text.trim() ? parsePaste(c, text) : null;
-  const rows = parsed ? [...ROLE_ORDER, 'dsm'].filter(k => k in parsed.roles).map(k => { const e = parsed.roles[k]; return `<div class="li"><span class="small grow">${esc(roleName(k))}</span>${!e ? `<span class="tag gray">${T('비어 있음', 'Open')}</span>` : e.mid ? `<b class="small">${esc(memberName(c, e))}</b><span class="tag">${T('멤버', 'Member')}</span>` : `<b class="small">${esc(e.name)}</b><span class="tag red">${T('명단에 없음', 'Not on roster')}</span>`}</div>`; }).join('') : '';
+  const rows = parsed ? [...ROLE_ORDER, 'dsm', 'dbm'].filter(k => k in parsed.roles).map(k => { const e = parsed.roles[k]; return `<div class="li"><span class="small grow">${esc(roleName(k))}</span>${!e ? `<span class="tag gray">${T('비어 있음', 'Open')}</span>` : e.mid ? `<b class="small">${esc(memberName(c, e))}</b><span class="tag">${T('멤버', 'Member')}</span>` : `<b class="small">${esc(e.name)}</b><span class="tag red">${T('명단에 없음', 'Not on roster')}</span>`}</div>`; }).join('') : '';
   return `${topbar(T('텍스트로 입력', 'Paste roles'), m ? `${meetingLabel(c, m)} · ${fmtDate(m.date)}` : clubName(c))}
   <div class="card"><p class="small muted" style="margin:0 0 10px">${T('단톡방의 역할자 텍스트를 그대로 붙여넣으세요. 역할 이름이 조금 달라도 알아서 인식해요.', 'Paste the role list from your group chat. Label variations are recognized.')}</p>
   <textarea class="inp" id="pastebox" data-live="1" data-act-input="paste" placeholder="[KUTM #820 역할자] 11/19(목)&#10;Theme: Work&#10;TM: Gloria&#10;G.E: Abdul&#10;발표자1: Jiae - From President&#10;T: Jiae">${esc(text)}</textarea></div>
@@ -786,6 +788,7 @@ const DEFAULT_ITEMS = {
     roles: [{ text: "Toastmaster introduces today's theme" }, { text: 'General Evaluator', role: 'ge' }, { text: 'Grammarian', role: 'gram' }, { text: 'Ah-Counter', role: 'ah' }, { text: 'Timer', role: 'timer' }],
     tt: [{ text: 'Table Topics Master explains the rules' }, { text: 'Conduct Table Topics Session (1-2 min)' }, { text: "Call for Timer's Report and Call for Submission of Votes" }],
     ds: [{ text: 'Discussion Session Master explains the topic' }],
+    db: [{ text: 'Debate Session Master explains the motion and rules' }],
     speeches: [{ text: '1 min silence for feedback' }, { text: "Call for Timer's Report and Call for Submission of Votes" }],
     evaluation: [{ text: 'Speech Evaluation (2-3 min) per speech' }, { text: "Call for Timer's Report and Submission of Votes" }, { text: "Ah-Counter's report", role: 'ah' }, { text: "Grammarian's report", role: 'gram' }, { text: "General Evaluator's report", role: 'ge' }],
     awards: [{ text: 'Best Evaluator' }, { text: 'Best Table Topics Speaker' }, { text: 'Best Speaker' }],
@@ -796,6 +799,7 @@ const DEFAULT_ITEMS = {
     roles: [{ text: '모임 주제 및 주제질문 소개' }, { text: '- 총평가자', role: 'ge' }, { text: '- 어지기', role: 'ah' }, { text: '- 시간지기', role: 'timer' }, { text: '- 어법지기', role: 'gram' }],
     tt: [{ text: '주제 질문 세션의 목적, 방법 설명 (1-2분)' }, { text: '주제 질문 진행 (연설자당 1-2분)' }, { text: '- 시간 보고 및 최우수 즉흥연설자 투표' }],
     ds: [{ text: '토론 주제 소개' }],
+    db: [{ text: '디베이트 주제 및 규칙 소개' }],
     speeches: [{ text: '연설 후 1분 피드백 작성' }, { text: '- 시간 보고 및 최우수 연설자 투표' }],
     evaluation: [{ text: '각 연설자의 연설 평가 (2-3분)' }, { text: '- 시간 보고 및 최우수 연설 평가자 투표' }, { text: '어지기 보고', role: 'ah' }, { text: '어법지기 보고', role: 'gram' }, { text: '총평가자 보고', role: 'ge' }],
     awards: [{ text: '최우수 연설 평가자, 최우수 즉흥연설자, 최우수 연설자' }],
@@ -803,8 +807,8 @@ const DEFAULT_ITEMS = {
   },
 };
 const AG_TITLES = {
-  en: { opening: 'Chair Calls Meeting to Order', roles: 'Toastmaster Calls on Meeting Roles', tt: 'Table Topics Session', ds: 'Discussion Session', break: 'Break', speeches: 'Prepared Speech Session', evaluation: 'Evaluation Session', awards: 'Awards Session', closing: 'Closing', education: 'Education Session', qa: 'Speech Q&A' },
-  ko: { opening: '의장의 개최', roles: '오늘의 토스트마스터즈', tt: '주제 질문 세션', ds: '토론 세션', break: '쉬는 시간', speeches: '준비 연설 세션', evaluation: '평가 세션', awards: '시상 세션', closing: '의장의 맺음말', education: '교육 세션', qa: '연설 질의응답' },
+  en: { opening: 'Chair Calls Meeting to Order', roles: 'Toastmaster Calls on Meeting Roles', tt: 'Table Topics Session', ds: 'Discussion Session', db: 'Debate Session', break: 'Break', speeches: 'Prepared Speech Session', evaluation: 'Evaluation Session', awards: 'Awards Session', closing: 'Closing', education: 'Education Session', qa: 'Speech Q&A' },
+  ko: { opening: '의장의 개최', roles: '오늘의 토스트마스터즈', tt: '주제 질문 세션', ds: '토론 세션', db: '디베이트 세션', break: '쉬는 시간', speeches: '준비 연설 세션', evaluation: '평가 세션', awards: '시상 세션', closing: '의장의 맺음말', education: '교육 세션', qa: '연설 질의응답' },
 };
 const agLang = c => clubLang(c) === 'en' ? 'en' : 'ko';
 const itemsOf = (b, lang) => Array.isArray(b.items) ? b.items : clone(((DEFAULT_ITEMS[lang] || DEFAULT_ITEMS.en)[b.type] || []).concat(b.desc ? [{ text: b.desc }] : []));
@@ -820,7 +824,7 @@ function flowEditor(f, m, start, lang) {
     return `<div class="frow" data-row="block" data-i="${i}"><button type="button" class="drag-h" aria-label="${T('꾹 눌러서 순서 바꾸기', 'Press and hold to reorder')}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 8h14M5 12h14M5 16h14"/></svg></button><div class="grow" style="min-width:0"><div class="row" style="gap:8px"><span class="xs blue" style="width:38px;font-weight:700;flex:none">${at}</span>${b.type === 'custom' ? `<input class="inp" style="min-height:34px" data-flow="title" data-i="${i}" value="${esc(b.title || '')}" placeholder="${T('세션 이름', 'Session name')}">` : `<b class="small grow">${esc((AG_TITLES[lang] || {})[b.type] || blockTitle(b, lang))}</b>`}${auto ? `<span class="tag" style="height:20px;font-size:11px">${T('자동', 'Auto')}</span>` : ''}<input class="inp" type="number" min="0" style="width:56px;min-height:32px;padding:0 8px;text-align:right;flex:none" data-flow="min" data-i="${i}" value="${mins}" aria-label="${T('분', 'minutes')}"><span class="xs muted" style="flex:none">${T('분', 'min')}</span><button class="ibtn" style="background:none" data-act="flowdel" data-i="${i}" aria-label="${T('세션 삭제', 'Remove session')}">✕</button></div>
       <div class="ilist" data-list="items:${i}">${items}</div><button class="addnote" data-act="itemadd" data-b="${i}">+ ${T('줄 추가', 'Add a note')}</button></div></div>`;
   }).join('');
-  return { html: `<div class="flist" data-list="flow">${rows}</div><div class="xs muted" style="margin:14px 0 6px;font-weight:700">+ ${T('세션 추가', 'Add session')}</div><div class="row wrap">${['break', 'education', 'qa', 'tt', 'ds', 'custom'].map(ty => `<button class="chip" data-act="flowadd" data-t="${ty}">${esc(ty === 'custom' ? BLOCK[ty][lang === 'en' ? 1 : 0] : (AG_TITLES[lang] || {})[ty] || BLOCK[ty][lang === 'en' ? 1 : 0])}</button>`).join('')}</div>`, end: t };
+  return { html: `<div class="flist" data-list="flow">${rows}</div><div class="xs muted" style="margin:14px 0 6px;font-weight:700">+ ${T('세션 추가', 'Add session')}</div><div class="row wrap">${['break', 'education', 'qa', 'tt', 'ds', 'db', 'custom'].map(ty => `<button class="chip" data-act="flowadd" data-t="${ty}">${esc(ty === 'custom' ? BLOCK[ty][lang === 'en' ? 1 : 0] : (AG_TITLES[lang] || {})[ty] || BLOCK[ty][lang === 'en' ? 1 : 0])}</button>`).join('')}</div>`, end: t };
 }
 function vFlow() {
   const { c, m: mid, template } = S.sub || {}; const m = template ? null : getM(c, mid);
@@ -855,8 +859,9 @@ function agendaModel(c, m, flowOverride) {
   const blocks = [];
   for (const b of (flowOverride || flowOf(c, m))) {
     const mins = blockMin(b, m); const at = t; t = addMin(t, mins);
-    const who = ({ opening: pres ? pres.name : '', closing: pres ? pres.name : nm('tm'), roles: nm('tm'), speeches: nm('tm'), awards: nm('tm'), tt: nm('ttm'), ds: nm('dsm'), evaluation: nm('ge') })[b.type] || '';
-    const items = itemsOf(b, L).map(it => it.auto === 'next' ? { text: nexts.length ? `${TL('다음 모임 날짜', 'Next Meeting')}: ${nexts.join(', ')}` : '' } : { text: it.text || '', who: it.role ? nm(it.role) : '' }).filter(it => it.text);
+    const who = ({ opening: pres ? pres.name : '', closing: pres ? pres.name : nm('tm'), roles: nm('tm'), speeches: nm('tm'), awards: nm('tm'), tt: nm('ttm'), ds: nm('dsm'), db: nm('dbm'), evaluation: nm('ge') })[b.type] || '';
+    const topic = b.type === 'ds' ? m.dsTopic : b.type === 'db' ? m.dbTopic : '';
+    const items = (topic ? [{ text: `${TL('주제', 'Topic')}: ${topic}` }] : []).concat(itemsOf(b, L)).map(it => it.auto === 'next' ? { text: nexts.length ? `${TL('다음 모임 날짜', 'Next Meeting')}: ${nexts.join(', ')}` : '' } : { text: it.text || '', who: it.role ? nm(it.role) : '' }).filter(it => it.text);
     const table = b.type === 'speeches' ? [1, 2, 3].map(n => ({ sp: m.roles && m.roles['sp' + n], ev: m.roles && m.roles['ev' + n] })).filter(r => r.sp).map(r => ({ project: [r.sp.path ? `${pathAbbr(r.sp.path)} Lv.${r.sp.level || ''}` : '', r.sp.project || ''].filter(Boolean).join(' '), title: r.sp.title || '', speaker: memberName(c, r.sp), time: r.sp.tmin ? `${r.sp.tmin}-${r.sp.tmax}${TL('분', 'min')}` : '', evaluator: memberName(c, r.ev) })) : null;
     blocks.push({ at, title: b.type === 'custom' ? (b.title || '') : (AG_TITLES[L][b.type] || blockTitle(b, L)), who, items, table, isBreak: b.type === 'break' });
   }
@@ -908,7 +913,7 @@ function chatText(c, m) {
   if (m.wodMeaning) out.push(m.wodMeaning);
   if (m.wodExample) out.push(m.wodExample);
   out.push('---', `${L('진행자', 'Toastmaster')}: ${nm('tm')}`, `${L('총평가자', 'General Evaluator')}: ${nm('ge')}`);
-  for (const x of sessionsOf(m)) { const k = sessionKey(x); out.push(`${x.type === 'tt' ? L('주제 질문 세션 진행자', 'Table Topics Master') : x.type === 'ds' ? L('토론 세션 진행자', 'Discussion Session Master') : (x.title || '') + L(' 진행자', ' Leader')}: ${nm(k)}`); }
+  for (const x of sessionsOf(m)) { const k = sessionKey(x); out.push(`${x.type === 'tt' ? L('주제 질문 세션 진행자', 'Table Topics Master') : x.type === 'ds' ? L('토론 세션 진행자', 'Discussion Session Master') : x.type === 'db' ? L('디베이트 세션 진행자', 'Debate Session Master') : (x.title || '') + L(' 진행자', ' Leader')}: ${nm(k)}`); const tp = x.type === 'ds' ? m.dsTopic : x.type === 'db' ? m.dbTopic : ''; if (tp) out.push(`${L('주제', 'Topic')}: ${tp}`); }
   out.push('---');
   [1, 2, 3].forEach(n => { if (n > 1) out.push(''); out.push(`${L('발표자', 'Speaker')} ${n}: ${nm('sp' + n)}`, `${L('평가자', 'Evaluator')} ${n}: ${nm('ev' + n)}`); });
   out.push('---', `${L('시간지기', 'Timer')}: ${nm('timer')}`, `${L('어법지기', 'Grammarian')}: ${nm('gram')}`, `${L('어지기', 'Ah-Counter')}: ${nm('ah')}`);
@@ -1371,7 +1376,7 @@ document.addEventListener('click', async e => {
   try {
     switch (a) {
       case 'go': S.draft = {}; go(el.dataset.v); break;
-      case 'sesstoggle': { const m = getM(c, mid); const t = el.dataset.t; let ses = sessionsOf(m).slice(); const on = ses.some(x => x.type === t); ses = on ? ses.filter(x => x.type !== t) : (t === 'tt' ? [{ id: 'tt', type: 'tt' }, ...ses] : [...ses, { id: t, type: t }]); const patch = { sessions: ses }; if (on) patch.roles = { [t === 'tt' ? 'ttm' : 'dsm']: null }; await Store.update(mPath(c, mid), patch); break; }
+      case 'sesstoggle': { const m = getM(c, mid); const t = el.dataset.t; let ses = sessionsOf(m).slice(); const on = ses.some(x => x.type === t); ses = on ? ses.filter(x => x.type !== t) : (t === 'tt' ? [{ id: 'tt', type: 'tt' }, ...ses] : [...ses, { id: t, type: t }]); const patch = { sessions: ses }; if (on) patch.roles = { [sessionKey({ type: t })]: null }; await Store.update(mPath(c, mid), patch); break; }
       case 'sessadd': S.sheet = () => `<h2>${T('세션 추가', 'Add a session')}</h2><label class="f" style="margin-top:12px">${T('세션 이름', 'Session name')}<input class="inp" id="ses_t" placeholder="${T('예: 교육 세션', 'e.g. Education')}"></label><div class="two"><button class="btn sec" data-act="closesheet">${T('닫기', 'Close')}</button><button class="btn" data-act="sesssave" data-c="${c}" data-m="${mid}">${T('추가', 'Add')}</button></div>`; render(); break;
       case 'sesssave': { const t = val('ses_t'); if (!t) return; const m = getM(c, mid); await Store.update(mPath(c, mid), { sessions: [...sessionsOf(m), { id: 'x' + uidGen(), type: 'custom', title: t }] }); S.sheet = null; render(); break; }
       case 'sessdel': { const m = getM(c, mid); const id = el.dataset.id; await Store.update(mPath(c, mid), { sessions: sessionsOf(m).filter(x => x.id !== id), roles: { ['cs' + id]: null } }); break; }
@@ -1427,8 +1432,8 @@ document.addEventListener('click', async e => {
       case 'ttsadd': S.sheet = () => { const m = getM(c, mid); const have = new Set((m.tts || []).map(x => x.mid)); return `<h2>${T('주제 질문 발표자 추가', 'Add TT speakers')}</h2><div class="row wrap" style="margin-top:12px">${Object.values(S.members[c] || {}).map(mm => `<button class="chip ${have.has(mm.id) ? 'on' : ''}" data-act="ttstoggle" data-c="${c}" data-m="${mid}" data-id="${mm.id}">${esc(mm.name)}</button>`).join('')}</div><button class="btn block" style="margin-top:14px" data-act="closesheet">${T('완료', 'Done')}</button>`; }; render(); break;
       case 'ttstoggle': { const m = getM(c, mid); const id = el.dataset.id; let list = (m.tts || []).slice(); if (list.some(x => x.mid === id)) list = list.filter(x => x.mid !== id); else list.push({ mid: id }); await Store.update(mPath(c, mid), { tts: list }); break; }
       case 'editfield': {
-        const f = el.dataset.f; const m = getM(c, mid); const labels = { theme: T('테마', 'Theme'), tq: T('테마 질문', 'Theme question'), wod: T('오늘의 단어', 'Word of the Day') };
-        S.sheet = () => `<h2>${labels[f]}</h2><label class="f" style="margin-top:12px">${labels[f]}<input class="inp" id="ef_v" value="${esc(m[f] || '')}"></label>${f === 'wod' ? `<label class="f">${T('뜻 (선택)', 'Meaning (optional)')}<input class="inp" id="ef_m" value="${esc(m.wodMeaning || '')}"></label><label class="f">${T('예문 (선택)', 'Example sentence (optional)')}<input class="inp" id="ef_x" value="${esc(m.wodExample || '')}"></label>` : ''}<div class="two"><button class="btn sec" data-act="closesheet">${T('닫기', 'Close')}</button><button class="btn" data-act="savefield" data-c="${c}" data-m="${mid}" data-f="${f}">${T('저장', 'Save')}</button></div>`;
+        const f = el.dataset.f; const m = getM(c, mid); const labels = { theme: T('테마', 'Theme'), tq: T('테마 질문', 'Theme question'), wod: T('오늘의 단어', 'Word of the Day'), dsTopic: T('토론 주제', 'Discussion topic'), dbTopic: T('디베이트 주제', 'Debate topic') };
+        S.sheet = () => `<h2>${labels[f]}</h2>${f === 'wod' ? `<label class="f" style="margin-top:12px">${T('단어', 'Word')}<input class="inp" id="ef_v" value="${esc(m[f] || '')}"></label>` : `<input class="inp" id="ef_v" style="margin:12px 0" aria-label="${esc(labels[f])}" placeholder="${f === 'dsTopic' || f === 'dbTopic' ? T('당일 다룰 주제를 적어 주세요', 'What will you discuss today?') : ''}" value="${esc(m[f] || '')}">`}${f === 'wod' ? `<label class="f">${T('뜻', 'Meaning')}<input class="inp" id="ef_m" value="${esc(m.wodMeaning || '')}"></label><label class="f">${T('예문 (선택)', 'Example sentence (optional)')}<input class="inp" id="ef_x" value="${esc(m.wodExample || '')}"></label>` : ''}<div class="two"><button class="btn sec" data-act="closesheet">${T('닫기', 'Close')}</button><button class="btn" data-act="savefield" data-c="${c}" data-m="${mid}" data-f="${f}">${T('저장', 'Save')}</button></div>`;
         if (S.view !== 'reserve') { S.backTo = S.view; S.view = 'reserve'; S.sub = { c, m: mid }; }
         render(); break;
       }
@@ -1533,7 +1538,7 @@ document.addEventListener('click', async e => {
         if (!target) { const cl = S.clubs[c]; let date = todayStr(); if (p.md) { const now = new Date(); const d = new Date(now.getFullYear(), p.md[0] - 1, p.md[1]); if (d < new Date(now.getFullYear(), now.getMonth() - 2, 1)) d.setFullYear(now.getFullYear() + 1); date = ymd(d); } target = 'mt' + uidGen(); await Store.set(mPath(c, target), { no: p.no || '', date, start: cl.start, end: cl.end, roles: {}, tts: [], status: 'open', flow: clone((tplsOf(cl)[S.draft.amTpl || 0] || tplsOf(cl)[0]).flow), createdAt: Date.now() }); }
         const m = getM(c, target) || {}; const merged = {};
         for (const kk in roles) { const prev = (m.roles || {})[kk] || {}; const r = roles[kk]; merged[kk] = r ? (roleType(kk) === 'sp' ? { ...(prev.mid === r.mid || (!r.mid && prev.name === r.name) ? prev : {}), ...r } : r) : null; }
-        if ('dsm' in roles && roles.dsm && !sessionsOf(m).some(x => x.type === 'ds')) data.sessions = [...sessionsOf(m), { id: 'ds', type: 'ds' }];
+        { let ses = sessionsOf(m); for (const [rk, ty] of [['dsm', 'ds'], ['dbm', 'db']]) if (roles[rk] && !ses.some(x => x.type === ty)) ses = [...ses, { id: ty, type: ty }]; if (ses !== sessionsOf(m)) data.sessions = ses; }
         await Store.update(mPath(c, target), { ...data, roles: merged, ...(p.tts.length ? { tts: p.tts } : {}) });
         toast(T('역할을 반영했어요', 'Roles applied')); S.backTo = 'meetings'; S.view = 'reserve'; S.sub = { c, m: target }; S.draft = {}; render(); break;
       }

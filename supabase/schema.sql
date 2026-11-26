@@ -190,12 +190,13 @@ create trigger b_member_guard before update on public.members
 
 -- Members who are not officers may book or cancel only their own roles,
 -- add or remove only themselves as Table Topics speakers,
--- and edit the theme (Toastmaster) or Word of the Day (Grammarian) only when they hold that role.
+-- and edit the theme (Toastmaster), Word of the Day (Grammarian) or the Discussion/Debate topic
+-- (that session's master) only when they hold that role.
 create or replace function public.tm_meeting_guard()
 returns trigger language plpgsql set search_path = public as $$
 declare
   me text; k text; o jsonb; n jsonb;
-  free_keys text[] := array['roles', 'tts', 'theme', 'tq', 'wod', 'wodMeaning'];
+  free_keys text[] := array['roles', 'tts', 'theme', 'tq', 'wod', 'wodMeaning', 'wodExample', 'dsTopic', 'dbTopic'];
 begin
   if auth.uid() is null or public.tm_is_officer(old.club_id) then return new; end if;
   me := public.tm_my_member(old.club_id);
@@ -223,8 +224,17 @@ begin
      and coalesce(new.data -> 'roles' -> 'tm' ->> 'mid', '') <> me then
     raise exception 'TM_OFFICERS_ONLY';
   end if;
-  if ((old.data -> 'wod') is distinct from (new.data -> 'wod') or (old.data -> 'wodMeaning') is distinct from (new.data -> 'wodMeaning'))
+  if ((old.data -> 'wod') is distinct from (new.data -> 'wod') or (old.data -> 'wodMeaning') is distinct from (new.data -> 'wodMeaning')
+      or (old.data -> 'wodExample') is distinct from (new.data -> 'wodExample'))
      and coalesce(new.data -> 'roles' -> 'gram' ->> 'mid', '') <> me then
+    raise exception 'TM_OFFICERS_ONLY';
+  end if;
+  if (old.data -> 'dsTopic') is distinct from (new.data -> 'dsTopic')
+     and coalesce(new.data -> 'roles' -> 'dsm' ->> 'mid', '') <> me then
+    raise exception 'TM_OFFICERS_ONLY';
+  end if;
+  if (old.data -> 'dbTopic') is distinct from (new.data -> 'dbTopic')
+     and coalesce(new.data -> 'roles' -> 'dbm' ->> 'mid', '') <> me then
     raise exception 'TM_OFFICERS_ONLY';
   end if;
   return new;
