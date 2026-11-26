@@ -647,6 +647,7 @@ function vReserve() {
     if (!e) right = final ? `<span class="tag gray">${T('비어 있음', 'Open')}</span>` : `<button class="btn tint sm" data-act="book" data-c="${c}" data-m="${mid}" data-k="${k}">${T('예약', 'Book')}</button>`;
     else if (isMine(c, e)) right = `<b class="small red">${esc(memberName(c, e))}</b>${!final ? `${sp ? `<button class="btn sec sm" data-act="book" data-c="${c}" data-m="${mid}" data-k="${k}">${T('연설 정보', 'Speech info')}</button>` : ''}<button class="btn red sm" data-act="cancelask" data-c="${c}" data-m="${mid}" data-k="${k}">${T('취소', 'Cancel')}</button>` : ''}`;
     else right = `<b class="small">${esc(memberName(c, e))}</b>${e.mid ? '' : `<span class="tag gray">${T('게스트', 'Guest')}</span>`}`;
+    if (off && !locked && sp && e && (!isMine(c, e) || final)) right += `<button class="btn sec sm" data-act="book" data-c="${c}" data-m="${mid}" data-k="${k}">${T('연설 정보', 'Speech info')}</button>`;
     if (off && !locked) right += `<button class="ibtn" style="background:#F2F3F5" data-act="assign" data-c="${c}" data-m="${mid}" data-k="${k}" aria-label="${T('담당자 바꾸기', 'Change assignee')}">${IC.pen}</button>`;
     const sub = sp && e ? `<div class="xs muted">${esc(e.title || T('[연설 제목 미정]', '[Title TBD]'))}${e.tmin ? ` · ${e.tmin}–${e.tmax}${T('분', ' min')}` : ''}${e.path ? ` · ${esc(e.path)}${e.level ? ' L' + e.level : ''}` : ''}</div>` : '';
     return `<div class="${plain ? 'rrow' : 'li'}" style="flex-wrap:wrap"><div class="grow"><span class="small">${esc(label || roleName(k, m))}</span></div><div class="row">${right}</div>${sub ? `<div style="flex-basis:100%;margin-top:-6px">${sub}</div>` : ''}</div>`;
@@ -669,13 +670,14 @@ function speechSheet(c, mid, k) {
   return () => {
     const m = getM(c, mid); const e = (m && m.roles && m.roles[k]) || {}; const me = S.me || {};
     const d = S.draft.sp || (S.draft.sp = { title: e.title || '', path: e.path || me.path || '', level: e.level || me.level || 1, project: e.project || '', tmin: e.tmin || 5, tmax: e.tmax || 7, custom: false });
-    return `<div class="row between"><h2>${esc(roleName(k))} ${T('예약', 'booking')}</h2><button class="ibtn" style="background:#F2F3F5" data-act="closesheet">✕</button></div><p class="xs muted" style="margin:4px 0 14px">${T('제목을 아직 정하지 않았다면 비워 두고 나중에 수정할 수 있어요.', 'Leave the title empty if undecided; you can edit it later.')}</p>
+    const editing = !!(m && m.roles && m.roles[k]), other = editing && !isMine(c, m.roles[k]);
+    return `<div class="row between"><h2>${esc(roleName(k))} ${editing ? T('연설 정보', 'speech info') : T('예약', 'booking')}</h2><button class="ibtn" style="background:#F2F3F5" data-act="closesheet">✕</button></div><p class="xs muted" style="margin:4px 0 14px">${other ? T(`${esc(memberName(c, m.roles[k]))} 님의 연설 정보를 운영진 권한으로 수정해요.`, `Editing ${esc(memberName(c, m.roles[k]))}'s speech info as an officer.`) : T('제목을 아직 정하지 않았다면 비워 두고 나중에 수정할 수 있어요.', 'Leave the title empty if undecided; you can edit it later.')}</p>
     <label class="f">${T('연설 제목', 'Speech title')}<input class="inp" id="sp_title" value="${esc(d.title)}" placeholder="${T('미정이면 비워두기', 'Optional')}"></label>
     <label class="f">${T('패스웨이', 'Path')}<select class="inp" id="sp_path"><option value="">-</option>${PATHS.map(p => `<option ${d.path === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select></label>
     <div class="two"><label class="f">${T('레벨', 'Level')}<select class="inp" id="sp_level">${[1, 2, 3, 4, 5].map(l => `<option ${Number(d.level) === l ? 'selected' : ''}>${l}</option>`).join('')}</select></label><label class="f">${T('프로젝트', 'Project')}<input class="inp" id="sp_proj" value="${esc(d.project)}"></label></div>
     <div class="f" style="font-size:13px;color:#52525B;margin-bottom:6px">${T('연설 시간', 'Speech time')}</div><div class="row wrap" style="margin-bottom:10px">${SPEECH_TIMES.map(([a, b]) => `<button class="chip ${d.tmin === a && d.tmax === b && !d.custom ? 'on' : ''}" data-act="sptime" data-a="${a}" data-b="${b}">${a}–${b}${T('분', ' min')}</button>`).join('')}<button class="chip ${d.custom ? 'on' : ''}" data-act="sptime" data-a="0">${T('직접 설정', 'Custom')}</button></div>
     ${d.custom ? `<div class="two"><label class="f">${T('최소(분)', 'Min')}<input class="inp" id="sp_tmin" type="number" value="${d.tmin}"></label><label class="f">${T('최대(분)', 'Max')}<input class="inp" id="sp_tmax" type="number" value="${d.tmax}"></label></div>` : ''}
-    <button class="btn block" data-act="savespeech" data-c="${c}" data-m="${mid}" data-k="${k}">${T('예약하기', 'Book')}</button>`;
+    <button class="btn block" data-act="savespeech" data-c="${c}" data-m="${mid}" data-k="${k}">${editing ? T('저장', 'Save') : T('예약하기', 'Book')}</button>`;
   };
 }
 
@@ -1401,17 +1403,17 @@ document.addEventListener('click', async e => {
       }
       case 'book': {
         const m = getM(c, mid); if (!m) return; const me = myMember(c); if (!me) { toast(T('이 클럽 멤버로 연결되어 있지 않아요', 'You are not a member of this club')); return; }
-        if (m.roles && m.roles[k] && !isMine(c, m.roles[k])) { toast(T('이미 다른 분이 예약했어요', 'Already taken')); return; }
+        if (m.roles && m.roles[k] && !isMine(c, m.roles[k]) && !(isOfficer(c) && roleType(k) === 'sp')) { toast(T('이미 다른 분이 예약했어요', 'Already taken')); return; }
         if (roleType(k) === 'sp') { S.draft.sp = null; S.sheet = speechSheet(c, mid, k); render(); return; }
         await Store.update(mPath(c, mid), { roles: { [k]: { mid: me.id } } }); toast(T(`${roleName(k, m)} 예약했어요`, `Booked ${roleName(k, m)}`)); break;
       }
       case 'sptime': { const d = S.draft.sp; keepSpeech(); if (el.dataset.a === '0') d.custom = true; else { d.custom = false; d.tmin = Number(el.dataset.a); d.tmax = Number(el.dataset.b); } render(); break; }
       case 'savespeech': {
-        keepSpeech(); const d = S.draft.sp; const me = myMember(c); const m = getM(c, mid);
+        keepSpeech(); const d = S.draft.sp; const me = myMember(c); const m = getM(c, mid); const wasBooked = !!(m.roles && m.roles[k]);
         if (m.roles && m.roles[k] && !isMine(c, m.roles[k]) && !isOfficer(c)) { toast(T('이미 다른 분이 예약했어요', 'Already taken')); return; }
         const cur = (m.roles && m.roles[k] && !isMine(c, m.roles[k])) ? m.roles[k] : { mid: me.id };
         await Store.update(mPath(c, mid), { roles: { [k]: { ...cur, title: d.title, path: d.path, level: Number(d.level), project: d.project, tmin: Number(d.tmin), tmax: Number(d.tmax) } } });
-        S.sheet = null; S.draft.sp = null; toast(T('연설을 예약했어요', 'Speech booked')); break;
+        S.sheet = null; S.draft.sp = null; toast(wasBooked ? T('연설 정보를 저장했어요', 'Speech info saved') : T('연설을 예약했어요', 'Speech booked')); break;
       }
       case 'cancelask': S.sheet = confirmSheet(T(`${roleName(k, getM(c, mid))} 예약을 취소할까요?`, `Cancel ${roleName(k, getM(c, mid))}?`), T('다른 멤버가 바로 예약할 수 있게 돼요.', 'Others can book it right away.'), T('예약 취소', 'Cancel booking'), 'cancel', { c, m: mid, k }, true); render(); break;
       case 'cancel': await Store.update(mPath(c, mid), { roles: { [k]: null } }); S.sheet = null; toast(T('취소했어요', 'Cancelled')); break;
