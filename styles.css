@@ -173,3 +173,8 @@ div.f{font-size:13px;color:#52525B}
  .sheet{border-radius:24px}
  .toast{bottom:32px}
 }
+
+/* speech info: Level + Specific level on one line on PC */
+.lvrow{display:grid;grid-template-columns:1fr;gap:0 14px}
+.lvrow .seg button{padding:0 4px;min-width:0}
+@media(min-width:900px){.lvrow{grid-template-columns:1fr 1fr}}

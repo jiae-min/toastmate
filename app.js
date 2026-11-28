@@ -8,7 +8,7 @@ const S = {
   loading: true, offline: false, pendingRender: false, draft: {}, year: new Date().getFullYear(),
 };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const T = (ko, en) => S.lang === 'en' ? en : ko;
+const T = (ko, en) => S.biLang ? (ko === en ? ko : `${ko} / ${en}`) : S.lang === 'en' ? en : ko;
 const pad = n => String(n).padStart(2, '0');
 const ymd = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
 const todayStr = () => ymd(new Date());
@@ -311,6 +311,9 @@ const myClubIds = () => (S.me && Array.isArray(S.me.clubs) ? [...new Set(S.me.cl
 const clubNick = c => (S.clubs[c] && (S.clubs[c].nick || S.clubs[c].official)) || '';
 const clubName = c => clubNick(c);
 const clubLang = c => (S.clubs[c] && S.clubs[c].langs && S.clubs[c].langs[0]) || 'ko';
+// Home follows the club's language: Korean-only → ko, no Korean → en, Korean + another language → both (bilingual).
+const clubUi = c => { const ls = (S.clubs[c] && S.clubs[c].langs && S.clubs[c].langs.length) ? S.clubs[c].langs : ['ko']; const ko = ls.includes('ko'); return ko && ls.some(l => l !== 'ko') ? 'bi' : ko ? 'ko' : 'en'; };
+function inClubLang(c, fn) { const keep = [S.lang, S.biLang]; const ui = clubUi(c); S.lang = ui === 'bi' ? (clubLang(c) === 'ko' ? 'ko' : 'en') : ui; S.biLang = ui === 'bi'; try { return fn(); } finally { S.lang = keep[0]; S.biLang = keep[1]; } }
 const myMember = c => Object.values(S.members[c] || {}).find(m => m.uid === S.uid) || null;
 const canDistrict = () => S.mode === 'local' || !!S.districtAdmin;
 const isAppOwner = () => S.mode !== 'supa' || S.demo || ((window.TOASTMATE_CONFIG || {}).ownerIds || []).includes(S.uid);
@@ -524,6 +527,10 @@ function readClubFields(base) {
 function vHome() {
   const c = S.curClub && myClubIds().includes(S.curClub) ? S.curClub : (S.curClub = myClubIds()[0]);
   const m = nextMeeting(c), off = isOfficer(c);
+  const next = c ? inClubLang(c, () => homeNext(c, m, off)) : '';
+  return `${reqBanner()}<div class="top" style="gap:0"><div class="cscroll">${clubSwitcher()}</div><span class="mename">${esc(S.me.name)}</span></div>${next}${roleMixCard(true)}`;
+}
+function homeNext(c, m, off) {
   let next;
   if (!m) next = `<div class="card"><h2>${T('다음 모임', 'Next meeting')}</h2><div class="empty-state">${T('등록된 다음 모임이 없어요.', 'No upcoming meeting yet.')}${off ? `<div style="margin-top:12px"><button class="btn" data-act="addmeeting" data-c="${c}">${T('모임 등록하기', 'Add a meeting')}</button></div>` : `<div class="xs" style="margin-top:6px">${T('운영진이 다음 모임을 등록하면 역할을 예약할 수 있어요.', 'You can book once an officer adds the next meeting.')}</div>`}</div></div>`;
   else {
@@ -537,7 +544,7 @@ function vHome() {
     <div class="slots">${[['tm', 'ge', ...leaderKeys(m)], ['sp1', 'sp2', 'sp3'], ['ev1', 'ev2', 'ev3'], ['timer', 'gram', 'ah']].map((r, i, a) => `<div class="grid3" style="${i < a.length - 1 ? 'margin-bottom:8px' : ''}">${r.map(k => slot(c, m, k)).join('')}</div>`).join('')}</div>
     <div class="row wrap end xs muted" style="gap:6px 12px;margin-top:10px"><span style="font-weight:700">${T('눌러서 예약·취소', 'Tap to book & cancel')}</span><span class="row wrap" style="gap:6px 12px"><span class="row" style="gap:4px"><i style="width:10px;height:10px;border-radius:3px;background:#fff;box-shadow:0 0 0 1px #E6E9EB;display:inline-block"></i>${T('빈 역할', 'Open')}</span><span class="row" style="gap:4px"><i style="width:10px;height:10px;border-radius:3px;background:#E5EDF2;display:inline-block"></i>${T('예약됨', 'Booked')}</span><span class="row" style="gap:4px"><i style="width:10px;height:10px;border-radius:3px;background:#772432;display:inline-block"></i>${T('내 역할', 'Mine')}</span></span></div></div>`;
   }
-  return `${reqBanner()}<div class="top" style="gap:0"><div class="cscroll">${clubSwitcher()}</div><span class="mename">${esc(S.me.name)}</span></div>${next}${roleMixCard(true)}`;
+  return next;
 }
 function homeCta(c, m, mine, open) {
   if (m.status === 'final') return '';
@@ -546,7 +553,7 @@ function homeCta(c, m, mine, open) {
   const k = order.find(x => mine.includes(x)) || mine.find(x => String(x).startsWith('cs'));
   if (!k) return open ? btn(T(`빈 역할 ${open}개 중 하나 예약하기`, `Book one of ${open} open roles`), 'openreserve') : btn(T('전체 역할 보기', 'See all roles'), 'openreserve');
   const t = roleType(k), e = m.roles[k] || {};
-  if (k === 'tm') return !m.theme ? btn(T('테마 정하기', 'Set the theme'), 'editfield', 'data-f="theme"') : !m.tq ? btn(T('테마 질문 정하기', 'Set the theme question'), 'editfield', 'data-f="tq"') : btn(T('발표자 소개 준비하기', 'Prepare speaker intros'), 'openreserve');
+  if (k === 'tm') return !m.theme ? btn(T('테마 정하기', 'Set the theme'), 'editfield', 'data-f="themeq"') : !m.tq ? btn(T('테마 질문 정하기', 'Set the theme question'), 'editfield', 'data-f="themeq"') : btn(T('발표자 소개 준비하기', 'Prepare speaker intros'), 'openreserve');
   if (k === 'gram') return !m.wod ? btn(T('오늘의 단어 정하기', 'Choose the WOD'), 'editfield', 'data-f="wod"') : btn(T('오늘의 단어 다듬기', 'Polish the WOD'), 'editfield', 'data-f="wod"');
   if (t === 'sp') return btn(e.title ? T('연설 정보 확인하기', 'Review my speech details') : T('연설 정보 입력하기', 'Add my speech details'), 'book', `data-k="${k}"`);
   if (t === 'ev') return btn(T('담당 발표자의 목표 확인하기', "Check my speaker's goals"), 'openreserve');
@@ -555,12 +562,13 @@ function homeCta(c, m, mine, open) {
   if (k === 'ah') return btn(T('내 역할 확인하기', 'Review my role'), 'openreserve');
   return btn(m.theme ? T(`테마 "${m.theme}"로 질문 준비하기`, `Prepare topics for "${m.theme}"`) : T('세션 질문 준비하기', 'Prepare your session'), 'openreserve');
 }
+function slotName(k, m) { if (!S.biLang) return esc(roleName(k, m)); const keep = S.biLang; S.biLang = false; const L = S.lang; S.lang = 'ko'; const ko = roleName(k, m); S.lang = 'en'; const en = roleName(k, m); S.lang = L; S.biLang = keep; return ko === en ? esc(ko) : `${esc(ko)}<br><span style="font-weight:400">${esc(en)}</span>`; }
 function slot(c, m, k) {
   const e = m.roles && m.roles[k];
   const locked = m.status === 'final';
-  if (!e) return `<button class="slot empty" ${locked ? 'disabled' : ''} data-act="book" data-c="${c}" data-m="${m.id}" data-k="${k}"><b>${esc(roleName(k, m))}</b>${T('예약 가능', 'Open')}</button>`;
-  if (isMine(c, e)) return `<button class="slot mine" ${locked ? 'disabled' : ''} data-act="cancelask" data-c="${c}" data-m="${m.id}" data-k="${k}"><b>${esc(roleName(k, m))}</b><span class="ell" style="max-width:100%">${esc(memberName(c, e))}</span></button>`;
-  return `<div class="slot"><b>${esc(roleName(k, m))}</b><span class="ell" style="max-width:100%">${esc(memberName(c, e))}</span></div>`;
+  if (!e) return `<button class="slot empty" ${locked ? 'disabled' : ''} data-act="book" data-c="${c}" data-m="${m.id}" data-k="${k}"><b>${slotName(k, m)}</b>${T('예약 가능', 'Open')}</button>`;
+  if (isMine(c, e)) return `<button class="slot mine" ${locked ? 'disabled' : ''} data-act="cancelask" data-c="${c}" data-m="${m.id}" data-k="${k}"><b>${slotName(k, m)}</b><span class="ell" style="max-width:100%">${esc(memberName(c, e))}</span></button>`;
+  return `<div class="slot"><b>${slotName(k, m)}</b><span class="ell" style="max-width:100%">${esc(memberName(c, e))}</span></div>`;
 }
 
 /* ================= role composition (radar) ================= */
@@ -604,7 +612,8 @@ function vMeetings() {
     const evs = evByDate[ds] || [];
     cells += `<div class="d ${d.getMonth() !== mo ? 'out' : ''}" data-act="daytap" data-d="${ds}"><span class="n ${ds === todayStr() ? 'today' : ''}" style="${d.getDay() === 0 && ds !== todayStr() ? 'color:#772432' : ''}">${d.getDate()}</span>${blocks}${evs.length ? `<button class="blk" style="background:#772432;color:#fff" data-act="eventsheet" data-e="${evs[0].id}">D93</button>` : ''}</div>`;
   }
-  const monthList = allMyMeetings().filter(m => m.date.startsWith(`${y}-${pad(mo + 1)}`));
+  const mKey = m => m.date + ' ' + (m.start || (S.clubs[m.club] || {}).start || '');
+  const monthList = allMyMeetings().filter(m => m.date.startsWith(`${y}-${pad(mo + 1)}`)).sort((a, b) => mKey(a).localeCompare(mKey(b)));
   const anyOfficer = ids.some(isOfficer);
   const events = Object.values(S.events).filter(e => e.date >= todayStr()).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
   return `<div style="height:16px"></div>
@@ -651,7 +660,7 @@ function vReserve() {
     else right = `<b class="small">${esc(memberName(c, e))}</b>${e.mid ? '' : `<span class="tag gray">${T('게스트', 'Guest')}</span>`}`;
     const infoBtn = sp && e && ((isMine(c, e) && !final) || (off && !locked)) ? `<button class="btn sec sm" data-act="book" data-c="${c}" data-m="${mid}" data-k="${k}">${T('연설 정보', 'Speech info')}</button>` : '';
     if (off && !locked) right += `<button class="ibtn" style="background:#F2F3F5" data-act="assign" data-c="${c}" data-m="${mid}" data-k="${k}" aria-label="${T('담당자 바꾸기', 'Change assignee')}">${IC.pen}</button>`;
-    const projLine = sp && e ? [e.path ? `${e.path}${e.level ? ' L' + e.level : ''}` : '', e.project || ''].filter(Boolean).join(' · ') : '';
+    const projLine = sp && e ? projText(e, true) : '';
     const sub = sp && e ? `<div class="xs muted" style="line-height:1.6">${[projLine ? esc(projLine) : T('[프로젝트 미정]', '[Project TBD]'), esc(e.title || T('[연설 제목 미정]', '[Title TBD]')), e.tmin ? `${e.tmin}–${e.tmax}${T('분', ' min')}` : T('[시간 미정]', '[Time TBD]')].join('<br>')}</div>` : '';
     return `<div class="${plain ? 'rrow' : 'li'}" style="flex-wrap:wrap"><div class="grow row" style="gap:8px"><span class="small">${esc(label || roleName(k, m))}</span>${infoBtn}</div><div class="row">${right}</div>${sub ? `<div style="flex-basis:100%;margin-top:-6px">${sub}</div>` : ''}</div>`;
   };
@@ -661,7 +670,7 @@ function vReserve() {
   return `${topbar(T('역할 예약하기', 'Book roles'), `${meetingLabel(c, m)} · ${fmtDate(m.date)} ${fmtTime(m.start)}`)}
   ${off ? `<div class="row wrap end offbar" style="gap:6px;padding:0 16px 12px"><button class="btn sec sm" data-act="openpaste" data-c="${c}" data-m="${mid}">${T('텍스트로 입력', 'Paste text')}</button><button class="btn sec sm" data-act="copytext" data-c="${c}" data-m="${mid}">${T('텍스트 반출', 'Copy text')}</button><button class="btn sec sm" data-act="openflow" data-c="${c}" data-m="${mid}">${T('아젠다 플로우', 'Agenda flow')}</button><button class="btn sm" data-act="openexport" data-c="${c}" data-m="${mid}">${T('미리보기 · 내보내기', 'Preview & export')}</button></div>` : ''}
   ${final ? `<div class="card infobox" style="padding:14px 16px;flex-direction:row;align-items:center"><span class="small blue grow">${T('확정된 모임이에요. 기록에 반영됐어요.', 'This meeting is finalized and recorded.')}</span>${off ? `<button class="btn sec sm" data-act="unfinal" data-c="${c}" data-m="${mid}">${T('확정 취소', 'Reopen')}</button>` : ''}</div>` : ''}
-  <div class="card"><h2>${T('모임 정보', 'Meeting info')}</h2><div class="list">${field('theme', T('테마', 'Theme'), canTheme)}${field('tq', T('테마 질문', 'Theme question'), canTheme)}${field('wod', T('오늘의 단어', 'Word of the Day'), canWod, 'wodMeaning')}</div></div>
+  <div class="card"><h2>${T('모임 정보', 'Meeting info')}</h2><div class="list">${(() => { const any = m.theme || m.tq; return `<div class="li"><div class="grow"><div class="xs blue" style="font-weight:700">${T('테마 & 테마 질문', 'Theme & theme question')}</div>${any ? `<div style="line-height:1.6">${m.theme ? esc(m.theme) : `<span class="muted small">${T('[테마 미정]', '[Theme TBD]')}</span>`}<br><span class="${m.tq ? 'small' : 'muted small'}">${m.tq ? esc(m.tq) : T('[테마 질문 미정]', '[Theme question TBD]')}</span></div>` : `<div class="muted small">${T('미정', 'TBD')}</div>`}</div>${canTheme && !locked ? `<button class="ibtn tool" data-act="editfield" data-c="${c}" data-m="${mid}" data-f="themeq" aria-label="${any ? T('수정', 'Edit') : T('추가', 'Add')}" title="${any ? T('수정', 'Edit') : T('추가', 'Add')}">${IC.pen}</button>` : ''}</div>`; })()}${field('wod', T('오늘의 단어', 'Word of the Day'), canWod, 'wodMeaning')}</div></div>
   <div class="card"><h2>${T('진행 · 평가', 'Leaders')}</h2><div class="list">${['tm', 'ge'].map(k => row(k)).join('')}</div></div>
   <div class="card"><div class="row between wrap" style="gap:8px"><h2>${T('세션', 'Sessions')}</h2>${off && !locked ? `<div class="row wrap end" style="gap:6px"><button class="chip ${has('tt') ? 'on' : ''}" data-act="sesstoggle" data-t="tt" data-c="${c}" data-m="${mid}">${T('주제 질문 세션', 'Table Topics')}</button><button class="chip ${has('ds') ? 'on' : ''}" data-act="sesstoggle" data-t="ds" data-c="${c}" data-m="${mid}">${T('토론 세션', 'Discussion')}</button><button class="chip ${has('db') ? 'on' : ''}" data-act="sesstoggle" data-t="db" data-c="${c}" data-m="${mid}">${T('디베이트 세션', 'Debate')}</button><button class="chip" data-act="sessadd" data-c="${c}" data-m="${mid}">+ ${T('다른 세션', 'Other')}</button></div>` : ''}</div>
   <div class="list" style="margin-top:6px">${ses.length ? ses.map(x => `<div class="li" style="flex-wrap:wrap;border:0;padding:6px 0 0;min-height:0"><span class="xs blue grow" style="font-weight:700">${esc(sesLabel(x))}</span>${(x.type === 'ds' || x.type === 'db') ? (() => { const tf = x.type + 'Topic'; const can = (off || isMine(c, m.roles && m.roles[sessionKey(x)])) && !locked; return `<div style="flex-basis:100%;display:flex;align-items:center;gap:8px;margin-top:4px"><div class="grow small ${m[tf] ? '' : 'muted'}">${m[tf] ? esc(m[tf]) : T('주제 미정', 'Topic TBD')}</div>${can ? `<button class="ibtn tool" data-act="editfield" data-c="${c}" data-m="${mid}" data-f="${tf}" aria-label="${T('주제 수정', 'Edit topic')}" title="${T('주제 수정', 'Edit topic')}">${IC.pen}</button>` : ''}</div>`; })() : ''}${off && !locked && x.type === 'custom' ? `<button class="xs muted" style="border:0;background:none;cursor:pointer" data-act="sessdel" data-c="${c}" data-m="${mid}" data-id="${esc(x.id)}">${T('삭제', 'Remove')}</button>` : ''}</div>${row(sessionKey(x))}`).join('') : `<div class="empty-state">${T('이번 모임에는 세션이 없어요.', 'No sessions this meeting.')}</div>`}</div></div>
@@ -672,12 +681,13 @@ function vReserve() {
 function speechSheet(c, mid, k) {
   return () => {
     const m = getM(c, mid); const e = (m && m.roles && m.roles[k]) || {}; const me = S.me || {};
-    const d = S.draft.sp || (S.draft.sp = { title: e.title || '', path: e.path || me.path || '', level: e.title || e.path || e.project ? (e.level || '') : (e.level || me.level || ''), project: e.project || '', tmin: e.tmin || 5, tmax: e.tmax || 7, custom: false });
+    const d = S.draft.sp || (S.draft.sp = { title: e.title || '', path: e.path || me.path || '', level: e.title || e.path || e.project ? (e.level || '') : (e.level || me.level || ''), sub: e.sub || '', project: e.project || '', tmin: e.tmin || 5, tmax: e.tmax || 7, custom: false });
     const editing = !!(m && m.roles && m.roles[k]), other = editing && !isMine(c, m.roles[k]);
     return `<div class="row between"><h2>${esc(roleName(k))} ${editing ? T('연설 정보', 'speech info') : T('예약', 'booking')}</h2><button class="ibtn" style="background:#F2F3F5" data-act="closesheet">✕</button></div><p class="xs muted" style="margin:4px 0 14px">${other ? T(`${esc(memberName(c, m.roles[k]))} 님의 연설 정보를 운영진 권한으로 수정해요.`, `Editing ${esc(memberName(c, m.roles[k]))}'s speech info as an officer.`) : T('제목을 아직 정하지 않았다면 비워 두고 나중에 수정할 수 있어요.', 'Leave the title empty if undecided; you can edit it later.')}</p>
     <label class="f">${T('연설 제목', 'Speech title')}<input class="inp" id="sp_title" value="${esc(d.title)}" placeholder="${T('미정이면 비워두기', 'Optional')}"></label>
     <label class="f">${T('패스웨이', 'Path')}<select class="inp" id="sp_path"><option value="">-</option>${PATHS.map(p => `<option ${d.path === p ? 'selected' : ''}>${esc(p)}</option>`).join('')}</select></label>
-    <div class="two"><label class="f">${T('레벨', 'Level')}<select class="inp" id="sp_level"><option value="" ${!d.level ? 'selected' : ''}>-</option>${[1, 2, 3, 4, 5].map(l => `<option ${Number(d.level) === l ? 'selected' : ''}>${l}</option>`).join('')}</select></label><label class="f">${T('프로젝트', 'Project')}<input class="inp" id="sp_proj" value="${esc(d.project)}"></label></div>
+    <div class="lvrow">${[['level', T('레벨', 'Level')], ['sub', T('세부 레벨', 'Specific level')]].map(([f, lab]) => `<div class="f"><div style="margin-bottom:6px">${lab}</div><div class="seg">${['', 1, 2, 3, 4, 5].map(v => `<button type="button" class="${String(d[f] || '') === String(v) ? 'on' : ''}" data-act="splv" data-f="${f}" data-v="${v}">${v || '-'}</button>`).join('')}</div></div>`).join('')}</div>
+    <label class="f">${T('프로젝트', 'Project')}<input class="inp" id="sp_proj" value="${esc(d.project)}" placeholder="${T('예: Reflect on Your Path', 'e.g. Reflect on Your Path')}"></label>
     <div class="f" style="font-size:13px;color:#52525B;margin-bottom:6px">${T('연설 시간', 'Speech time')}</div><div class="row wrap" style="margin-bottom:10px">${SPEECH_TIMES.map(([a, b]) => `<button class="chip ${d.tmin === a && d.tmax === b && !d.custom ? 'on' : ''}" data-act="sptime" data-a="${a}" data-b="${b}">${a}–${b}${T('분', ' min')}</button>`).join('')}<button class="chip ${d.custom ? 'on' : ''}" data-act="sptime" data-a="0">${T('직접 설정', 'Custom')}</button></div>
     ${d.custom ? `<div class="two"><label class="f">${T('최소(분)', 'Min')}<input class="inp" id="sp_tmin" type="number" value="${d.tmin}"></label><label class="f">${T('최대(분)', 'Max')}<input class="inp" id="sp_tmax" type="number" value="${d.tmax}"></label></div>` : ''}
     <button class="btn block" data-act="savespeech" data-c="${c}" data-m="${mid}" data-k="${k}">${editing ? T('저장', 'Save') : T('예약하기', 'Book')}</button>`;
@@ -836,6 +846,9 @@ function vFlow() {
 }
 
 /* ---------- agenda model ---------- */
+// "PM Lv.5-2 Reflect on Your Path" — Path, Level, Specific level, Project. Old free-text projects that already start with a level are shown as typed.
+const LV_RE = /(?:^|\s)(?:Lv\.?|Level)\s*\d/i;
+const projText = (sp, full) => { if (!sp) return ''; const lv = sp.level ? `Lv.${sp.level}${sp.sub ? '-' + sp.sub : ''}` : ''; const proj = sp.project || ''; if (LV_RE.test(proj)) return proj; return [sp.path ? (full ? sp.path : pathAbbr(sp.path)) : '', lv, proj].filter(Boolean).join(' '); };
 const pathAbbr = p => (p || '').replace(/^The /, '').split(/[\s:+]+/).filter(w => /^[A-Z]/.test(w)).map(w => w[0]).join('').slice(0, 3);
 const POSITIONS = [['President', '회장', 'President'], ['VPE', '교육 부회장', 'Vice President Education'], ['VPM', '회원 부회장', 'Vice President Membership'], ['VPPR', '홍보 부회장', 'Vice President Public Relations'], ['Treasurer', '재무', 'Treasurer'], ['Secretary', '서기', 'Secretary'], ['SAA', '장내 총무', 'Sergeant at Arms']];
 const POS_ALIAS = { 'vp education': 'VPE', 'vp membership': 'VPM', 'vp public relations': 'VPPR', 'vp pr': 'VPPR', 'sergeant-at-arms': 'SAA', 'sgt at arms': 'SAA', '부회장(교육)': 'VPE', '교육부회장': 'VPE', '회원부회장': 'VPM', '홍보부회장': 'VPPR', '장내총무': 'SAA', '총무': 'SAA' };
@@ -862,7 +875,7 @@ function agendaModel(c, m, flowOverride) {
     const who = ({ opening: pres ? pres.name : '', closing: pres ? pres.name : nm('tm'), roles: nm('tm'), speeches: nm('tm'), awards: nm('tm'), tt: nm('ttm'), ds: nm('dsm'), db: nm('dbm'), evaluation: nm('ge') })[b.type] || '';
     const topic = b.type === 'ds' ? m.dsTopic : b.type === 'db' ? m.dbTopic : '';
     const items = (topic ? [{ text: `${TL('주제', 'Topic')}: ${topic}` }] : []).concat(itemsOf(b, L)).map(it => it.auto === 'next' ? { text: nexts.length ? `${TL('다음 모임 날짜', 'Next Meeting')}: ${nexts.join(', ')}` : '' } : { text: it.text || '', who: it.role ? nm(it.role) : '' }).filter(it => it.text);
-    const table = b.type === 'speeches' ? [1, 2, 3].map(n => ({ sp: m.roles && m.roles['sp' + n], ev: m.roles && m.roles['ev' + n] })).filter(r => r.sp).map(r => ({ project: [r.sp.path ? `${pathAbbr(r.sp.path)} Lv.${r.sp.level || ''}` : '', r.sp.project || ''].filter(Boolean).join(' '), title: r.sp.title || '', speaker: memberName(c, r.sp), time: r.sp.tmin ? `${r.sp.tmin}-${r.sp.tmax}${TL('분', 'min')}` : '', evaluator: memberName(c, r.ev) })) : null;
+    const table = b.type === 'speeches' ? [1, 2, 3].map(n => ({ sp: m.roles && m.roles['sp' + n], ev: m.roles && m.roles['ev' + n] })).filter(r => r.sp).map(r => ({ project: projText(r.sp), title: r.sp.title || '', speaker: memberName(c, r.sp), time: r.sp.tmin ? `${r.sp.tmin}-${r.sp.tmax}${TL('분', 'min')}` : '', evaluator: memberName(c, r.ev) })) : null;
     blocks.push({ at, title: b.type === 'custom' ? (b.title || '') : (AG_TITLES[L][b.type] || blockTitle(b, L)), who, items, table, isBreak: b.type === 'break' });
   }
   const fee = club.fee || {};
@@ -1414,30 +1427,31 @@ document.addEventListener('click', async e => {
         if (roleType(k) === 'sp') { S.draft.sp = null; S.sheet = speechSheet(c, mid, k); render(); return; }
         await Store.update(mPath(c, mid), { roles: { [k]: { mid: me.id } } }); toast(T(`${roleName(k, m)} 예약했어요`, `Booked ${roleName(k, m)}`)); break;
       }
+      case 'splv': { keepSpeech(); S.draft.sp[el.dataset.f] = Number(el.dataset.v) || ''; keepInputs(render); break; }
       case 'sptime': { const d = S.draft.sp; keepSpeech(); if (el.dataset.a === '0') d.custom = true; else { d.custom = false; d.tmin = Number(el.dataset.a); d.tmax = Number(el.dataset.b); } render(); break; }
       case 'savespeech': {
         keepSpeech(); const d = S.draft.sp; const me = myMember(c); const m = getM(c, mid); const wasBooked = !!(m.roles && m.roles[k]);
         if (m.roles && m.roles[k] && !isMine(c, m.roles[k]) && !isOfficer(c)) { toast(T('이미 다른 분이 예약했어요', 'Already taken')); return; }
         const cur = (m.roles && m.roles[k] && !isMine(c, m.roles[k])) ? m.roles[k] : { mid: me.id };
-        await Store.update(mPath(c, mid), { roles: { [k]: { ...cur, title: d.title, path: d.path, level: Number(d.level) || '', project: d.project, tmin: Number(d.tmin), tmax: Number(d.tmax) } } });
+        await Store.update(mPath(c, mid), { roles: { [k]: { ...cur, title: d.title, path: d.path, level: Number(d.level) || '', sub: Number(d.sub) || '', project: d.project, tmin: Number(d.tmin), tmax: Number(d.tmax) } } });
         S.sheet = null; S.draft.sp = null; toast(wasBooked ? T('연설 정보를 저장했어요', 'Speech info saved') : T('연설을 예약했어요', 'Speech booked')); break;
       }
       case 'cancelask': S.sheet = confirmSheet(T(`${roleName(k, getM(c, mid))} 예약을 취소할까요?`, `Cancel ${roleName(k, getM(c, mid))}?`), T('다른 멤버가 바로 예약할 수 있게 돼요.', 'Others can book it right away.'), T('예약 취소', 'Cancel booking'), 'cancel', { c, m: mid, k }, true); render(); break;
       case 'cancel': await Store.update(mPath(c, mid), { roles: { [k]: null } }); S.sheet = null; toast(T('취소했어요', 'Cancelled')); break;
       case 'assign': S.sheet = memberPicker(c, mid, k); render(); break;
-      case 'setrole': { const id = el.dataset.id; const m = getM(c, mid); const prev = (m.roles && m.roles[k]) || {}; const keep = roleType(k) === 'sp' ? { title: prev.title || '', path: prev.path || '', level: prev.level || '', project: prev.project || '', tmin: prev.tmin || 5, tmax: prev.tmax || 7 } : {}; await Store.update(mPath(c, mid), { roles: { [k]: id ? { mid: id, ...keep } : null } }); S.sheet = null; render(); break; }
+      case 'setrole': { const id = el.dataset.id; const m = getM(c, mid); const prev = (m.roles && m.roles[k]) || {}; const keep = roleType(k) === 'sp' ? { title: prev.title || '', path: prev.path || '', level: prev.level || '', sub: prev.sub || '', project: prev.project || '', tmin: prev.tmin || 5, tmax: prev.tmax || 7 } : {}; await Store.update(mPath(c, mid), { roles: { [k]: id ? { mid: id, ...keep } : null } }); S.sheet = null; render(); break; }
       case 'setguest': { const n = val('guestname'); if (!n) return; await Store.update(mPath(c, mid), { roles: { [k]: { name: n } } }); S.sheet = null; render(); break; }
       case 'ttsme': { const m = getM(c, mid); const me = myMember(c); let list = (m.tts || []).filter(x => x.mid !== me.id); if (el.dataset.on === '1') list.push({ mid: me.id }); await Store.update(mPath(c, mid), { tts: list }); break; }
       case 'ttsdel': { const m = getM(c, mid); const list = (m.tts || []).slice(); list.splice(Number(el.dataset.i), 1); await Store.update(mPath(c, mid), { tts: list }); break; }
       case 'ttsadd': S.sheet = () => { const m = getM(c, mid); const have = new Set((m.tts || []).map(x => x.mid)); return `<h2>${T('주제 질문 발표자 추가', 'Add TT speakers')}</h2><div class="row wrap" style="margin-top:12px">${Object.values(S.members[c] || {}).map(mm => `<button class="chip ${have.has(mm.id) ? 'on' : ''}" data-act="ttstoggle" data-c="${c}" data-m="${mid}" data-id="${mm.id}">${esc(mm.name)}</button>`).join('')}</div><button class="btn block" style="margin-top:14px" data-act="closesheet">${T('완료', 'Done')}</button>`; }; render(); break;
       case 'ttstoggle': { const m = getM(c, mid); const id = el.dataset.id; let list = (m.tts || []).slice(); if (list.some(x => x.mid === id)) list = list.filter(x => x.mid !== id); else list.push({ mid: id }); await Store.update(mPath(c, mid), { tts: list }); break; }
       case 'editfield': {
-        const f = el.dataset.f; const m = getM(c, mid); const labels = { theme: T('테마', 'Theme'), tq: T('테마 질문', 'Theme question'), wod: T('오늘의 단어', 'Word of the Day'), dsTopic: T('토론 주제', 'Discussion topic'), dbTopic: T('디베이트 주제', 'Debate topic') };
-        S.sheet = () => `<h2>${labels[f]}</h2>${f === 'wod' ? `<label class="f" style="margin-top:12px">${T('단어', 'Word')}<input class="inp" id="ef_v" value="${esc(m[f] || '')}"></label>` : `<input class="inp" id="ef_v" style="margin:12px 0" aria-label="${esc(labels[f])}" placeholder="${f === 'dsTopic' || f === 'dbTopic' ? T('당일 다룰 주제를 적어 주세요', 'What will you discuss today?') : ''}" value="${esc(m[f] || '')}">`}${f === 'wod' ? `<label class="f">${T('뜻', 'Meaning')}<input class="inp" id="ef_m" value="${esc(m.wodMeaning || '')}"></label><label class="f">${T('예문 (선택)', 'Example sentence (optional)')}<input class="inp" id="ef_x" value="${esc(m.wodExample || '')}"></label>` : ''}<div class="two"><button class="btn sec" data-act="closesheet">${T('닫기', 'Close')}</button><button class="btn" data-act="savefield" data-c="${c}" data-m="${mid}" data-f="${f}">${T('저장', 'Save')}</button></div>`;
+        const f = el.dataset.f; const m = getM(c, mid); const labels = { themeq: T('테마 & 테마 질문', 'Theme & theme question'), theme: T('테마', 'Theme'), tq: T('테마 질문', 'Theme question'), wod: T('오늘의 단어', 'Word of the Day'), dsTopic: T('토론 주제', 'Discussion topic'), dbTopic: T('디베이트 주제', 'Debate topic') };
+        S.sheet = () => f === 'themeq' ? `<h2>${labels[f]}</h2><label class="f" style="margin-top:12px">${T('테마', 'Theme')}<input class="inp" id="ef_v" value="${esc(m.theme || '')}"></label><label class="f">${T('테마 질문', 'Theme question')}<input class="inp" id="ef_q" value="${esc(m.tq || '')}"></label><div class="two"><button class="btn sec" data-act="closesheet">${T('닫기', 'Close')}</button><button class="btn" data-act="savefield" data-c="${c}" data-m="${mid}" data-f="${f}">${T('저장', 'Save')}</button></div>` : `<h2>${labels[f]}</h2>${f === 'wod' ? `<label class="f" style="margin-top:12px">${T('단어', 'Word')}<input class="inp" id="ef_v" value="${esc(m[f] || '')}"></label>` : `<input class="inp" id="ef_v" style="margin:12px 0" aria-label="${esc(labels[f])}" placeholder="${f === 'dsTopic' || f === 'dbTopic' ? T('당일 다룰 주제를 적어 주세요', 'What will you discuss today?') : ''}" value="${esc(m[f] || '')}">`}${f === 'wod' ? `<label class="f">${T('뜻', 'Meaning')}<input class="inp" id="ef_m" value="${esc(m.wodMeaning || '')}"></label><label class="f">${T('예문 (선택)', 'Example sentence (optional)')}<input class="inp" id="ef_x" value="${esc(m.wodExample || '')}"></label>` : ''}<div class="two"><button class="btn sec" data-act="closesheet">${T('닫기', 'Close')}</button><button class="btn" data-act="savefield" data-c="${c}" data-m="${mid}" data-f="${f}">${T('저장', 'Save')}</button></div>`;
         if (S.view !== 'reserve') { S.backTo = S.view; S.view = 'reserve'; S.sub = { c, m: mid }; }
         render(); break;
       }
-      case 'savefield': { const f = el.dataset.f; const data = { [f]: val('ef_v') }; if (f === 'wod') { data.wodMeaning = val('ef_m'); data.wodExample = val('ef_x'); } await Store.update(mPath(c, mid), data); S.sheet = null; toast(T('저장했어요', 'Saved')); break; }
+      case 'savefield': { const f = el.dataset.f; const data = f === 'themeq' ? { theme: val('ef_v'), tq: val('ef_q') } : { [f]: val('ef_v') }; if (f === 'wod') { data.wodMeaning = val('ef_m'); data.wodExample = val('ef_x'); } await Store.update(mPath(c, mid), data); S.sheet = null; toast(T('저장했어요', 'Saved')); break; }
       case 'meetingsheet': e.stopPropagation(); S.sheet = meetingSheet(c, mid); render(); break;
       case 'eventsheet': e.stopPropagation(); { const ev = S.events[el.dataset.e]; S.sheet = () => { const dd = Math.round((parseD(ev.date) - parseD(todayStr())) / 864e5); return `<div class="row between"><span class="tag red">${dd === 0 ? 'D-DAY' : dd > 0 ? 'D-' + dd : T('지난 행사', 'Past')}</span><button class="ibtn" style="background:#F2F3F5" data-act="closesheet">✕</button></div><h1 style="font-size:22px;margin:8px 0">${esc(ev.title)}</h1><div class="kv"><span>${T('일자', 'Date')}</span><b>${esc(fmtDate(ev.date, true))}</b></div>${ev.time ? `<div class="kv"><span>${T('시간', 'Time')}</span><b>${esc(ev.time)}</b></div>` : ''}${ev.place ? `<div class="kv"><span>${T('장소', 'Place')}</span><b>${esc(ev.place)}</b></div>` : ''}<div class="row end" style="margin-top:14px;gap:8px">${canDistrict() ? `<button class="btn sec sm" data-act="delevent" data-e="${ev.id}">${T('삭제', 'Delete')}</button>` : ''}${ev.link ? `<a class="btn" href="${esc(ev.link)}" target="_blank" rel="noopener">${T('신청하기', 'Sign up')}</a>` : ''}</div>`; }; render(); break; }
       case 'daytap': { if (!myClubIds().some(isOfficer)) return; S.draft.amClub = null; S.draft.amRep = 0; S.draft.amCnt = 4; S.sheet = addMeetingSheet(S.curClub && isOfficer(S.curClub) ? S.curClub : myClubIds().find(isOfficer), el.dataset.d); render(); break; }
@@ -1690,7 +1704,7 @@ function reflFill() { if (document.activeElement) document.activeElement.blur();
   document.addEventListener('pointerup', end); document.addEventListener('pointercancel', end);
   document.addEventListener('contextmenu', e => { if (e.target.closest && e.target.closest('.drag-h, .drag-i')) e.preventDefault(); });
 })();
-function keepSpeech() { const d = S.draft.sp; if (!d) return; const g = id => document.getElementById(id); if (g('sp_title')) { d.title = val('sp_title'); d.path = val('sp_path'); d.level = Number(val('sp_level')) || ''; d.project = val('sp_proj'); } if (g('sp_tmin')) { d.tmin = Number(val('sp_tmin')) || d.tmin; d.tmax = Number(val('sp_tmax')) || d.tmax; } }
+function keepSpeech() { const d = S.draft.sp; if (!d) return; const g = id => document.getElementById(id); if (g('sp_title')) { d.title = val('sp_title'); d.path = val('sp_path');  d.project = val('sp_proj'); } if (g('sp_tmin')) { d.tmin = Number(val('sp_tmin')) || d.tmin; d.tmax = Number(val('sp_tmax')) || d.tmax; } }
 function keepInputs(after) { const vals = {}; $app.querySelectorAll('input[id]:not([type=file]),select[id],textarea[id]').forEach(i => vals[i.id] = i.value); if (after) { if (document.activeElement) document.activeElement.blur(); after(); for (const id in vals) { const i = document.getElementById(id); if (i && i.value !== vals[id]) i.value = vals[id]; } } }
 async function joinClub(c) {
   const ms = Object.values(S.members[c] || {}); let mine = ms.find(m => m.uid === S.uid);
