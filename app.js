@@ -702,21 +702,103 @@ const REFLECT_Q = [
   { id: 'words', ko: '원하는 표현이 떠올랐나요?', en: 'Did the right words come to you?', opts: [['잘 떠올랐음', 'Easily'], ['가끔 막힘', 'Sometimes stuck'], ['자주 막힘', 'Often stuck']] },
   { id: 'next', multi: true, ko: '다음에는 무엇을 해보고 싶나요?', en: 'What would you like to try next?', opts: [['같은 역할 다시', 'Same role again'], ['다른 역할', 'A different role'], ['연설', 'A speech'], ['평가', 'An evaluation']] },
 ];
-function vReflect() {
-  const sub = S.sub || {}; const key = sub.key || (sub.c + '_' + sub.m);
-  const saved = S.refl[key] || {}; const d = S.draft.refl || (S.draft.refl = clone(saved.answers || {}));
-  const savedM = saved.club && saved.meeting ? getM(saved.club, saved.meeting) : null;
-  if (S.draft.rclub === undefined) S.draft.rclub = sub.c || saved.club || (myClubIds()[0] || '');
-  if (S.draft.rdate === undefined) S.draft.rdate = (sub.c && sub.m && getM(sub.c, sub.m) ? getM(sub.c, sub.m).date : savedM ? savedM.date : saved.date) || todayStr();
+/* reflection: one question per page; drafts kept on this device until saved */
+const RDRAFT = 'toastmate-refldraft:';
+const rDraftKey = key => RDRAFT + (S.uid || 'anon') + ':' + key;
+function rDraftLoad(key) { try { const v = localStorage.getItem(rDraftKey(key)); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+function rDraftSave() {
+  const sub = S.sub || {}; const key = sub.key; if (!key || !S.draft.refl || S.draft.rdone || S.view !== 'reflect') return;
+  try { localStorage.setItem(rDraftKey(key), JSON.stringify({ answers: S.draft.refl, rclub: S.draft.rclub, rdate: S.draft.rdate, rrole: S.draft.rrole, step: S.draft.rstep || 0, c: sub.c, m: sub.m, at: Date.now() })); } catch (e) {}
+}
+function rDraftClear(key) { clearTimeout(rDraftSave.t); try { localStorage.removeItem(rDraftKey(key)); } catch (e) {} }
+function rOpenNewDraftKey() { try { const pre = RDRAFT + (S.uid || 'anon') + ':r'; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(pre) && !S.refl[k.slice(pre.length - 1)]) return k.slice(pre.length - 1); } } catch (e) {} return null; }
+function reflSteps() { const sub = S.sub || {}; return [...(sub.c && sub.m ? [] : ['ctx']), ...REFLECT_Q.map(q => q.id), 'rating', 'note']; }
+function reflCtx() {
+  const sub = S.sub || {}; const saved = S.refl[sub.key] || {};
   const c = S.draft.rclub; const m = c ? meetingsOf(c).find(x => x.date === S.draft.rdate) || null : null;
-  const roleTxt = m ? (myRolesIn(c, m).map(k => roleName(k, m)).join(', ') || T('맡은 역할 없음', 'No role')) : '';
-  return `${topbar(T('복기', 'Reflection'), T('잘했다·못했다가 아니라, 어땠는지만 남겨요. 나만 볼 수 있어요.', 'No grades, just how it went. Only you can see this.'))}
-  <div class="card"><div class="f" style="font-size:13px;color:#52525B;margin-bottom:6px">${T('클럽', 'Club')}</div><div class="seg" style="margin-bottom:14px;flex-wrap:wrap;border-radius:22px">${myClubIds().map(id => `<button class="${id === c ? 'on' : ''}" style="flex:1 0 auto;white-space:nowrap;padding:0 14px" data-act="rclub" data-c="${id}">${esc(clubName(id))}</button>`).join('')}<button class="${!c ? 'on' : ''}" style="flex:1 0 auto;white-space:nowrap;padding:0 14px" data-act="rclub" data-c="">${T('모임 밖', 'Outside')}</button></div>
-  <div class="two"><label class="f" style="margin:0">${T('날짜', 'Date')}<input class="inp" type="date" id="r_date" data-act-change="rdate" value="${esc(S.draft.rdate)}"></label><label class="f" style="margin:0">${T('내 역할', 'My role')}<input class="inp" id="r_role" value="${esc(m ? roleTxt : (saved.roleText || ''))}" ${m ? 'readonly' : `placeholder="${T(c ? '이 날짜에 모임이 없어요' : '예: 회사 발표', c ? 'No meeting on this date' : 'e.g. Work talk')}"`}></label></div>
-  ${m ? `<div class="xs muted" style="margin-top:8px">${esc(meetingLabel(c, m))}</div>` : ''}</div>
-  <div class="card"><div style="text-align:center;padding-bottom:10px"><h3>${T('오늘의 나, 별점으로', 'Overall rating')}</h3><div class="row" style="justify-content:center;gap:4px;margin-top:8px">${[1, 2, 3, 4, 5].map(v => `<button data-act="rstar" data-v="${v}" aria-label="${v}" style="border:0;background:none;cursor:pointer;padding:2px;color:${(d.rating || 0) >= v ? '#772432' : '#D5DADA'}">${IC.star}</button>`).join('')}</div></div>${REFLECT_Q.map((q, qi) => `<div style="padding:12px 0"><h3 style="margin-bottom:10px">${qi + 1}. ${T(q.ko, q.en)}${q.multi ? `<span class="xs muted" style="font-weight:400"> · ${T('여러 개 선택', 'pick any')}</span>` : ''}</h3><div class="row wrap" style="gap:6px">${q.opts.map((o, i) => { const on = q.multi ? (d[q.id] || []).includes(i) : d[q.id] === i; return `<button class="chip ${on ? 'on' : ''}" data-act="rq" data-q="${q.id}" data-i="${i}">${T(o[0], o[1])}</button>`; }).join('')}</div></div>`).join('')}
-  <div style="padding-top:12px"><label class="f" style="margin:0"><h3 style="color:#18181B">${T('메모', 'Notes')}<span class="xs muted" style="font-weight:400"> · ${T('선택', 'optional')}</span></h3><textarea class="inp" id="r_note" style="min-height:120px" placeholder="${T('느낀 점, 다음에 해보고 싶은 것을 자유롭게 적어요.', 'Anything you noticed or want to try next time.')}">${esc(d.note || '')}</textarea></label></div></div>
-  <div style="padding:0 12px" class="${saved.answers ? 'two' : ''}">${saved.answers ? `<button class="btn red block" data-act="delrefl" data-id="${esc(key)}">${T('삭제', 'Delete')}</button>` : ''}<button class="btn block" data-act="savereflect" data-id="${esc(key)}">${saved.answers ? T('수정하기', 'Update') : T('기록 남기기', 'Save reflection')}</button></div>`;
+  const roleTxt = m ? (myRolesIn(c, m).map(k => roleName(k, m)).join(', ') || T('맡은 역할 없음', 'No role')) : (S.draft.rrole !== undefined ? S.draft.rrole : (saved.roleText || ''));
+  return { c, m, roleTxt, line: [c ? clubName(c) : T('모임 밖', 'Outside'), fmtMD(S.draft.rdate), roleTxt].filter(Boolean).join(' · ') };
+}
+const fmtMD = d => { if (!d) return ''; const x = parseD(d); return `${x.getMonth() + 1}/${x.getDate()}`; };
+function reflInit() {
+  const sub = S.sub || {}; const key = sub.key || (sub.c + '_' + sub.m); sub.key = key;
+  if (S.draft.refl) return;
+  const saved = S.refl[key] || {}; const dr = rDraftLoad(key);
+  const savedM = saved.club && saved.meeting ? getM(saved.club, saved.meeting) : null;
+  S.draft.redit = !!saved.answers; S.draft.rmode = saved.answers ? 'summary' : 'flow'; S.draft.rfield = null;
+  S.draft.refl = clone((dr && dr.answers) || saved.answers || {});
+  S.draft.rclub = dr && dr.rclub !== undefined ? dr.rclub : (sub.c || saved.club || (myClubIds()[0] || ''));
+  S.draft.rdate = (dr && dr.rdate) || (sub.c && sub.m && getM(sub.c, sub.m) ? getM(sub.c, sub.m).date : savedM ? savedM.date : saved.date) || todayStr();
+  S.draft.rrole = dr && dr.rrole !== undefined ? dr.rrole : undefined;
+  S.draft.rstep = dr && !saved.answers ? Math.min(dr.step || 0, reflSteps().length - 1) : 0;
+  S.draft.rdirty = !!dr && !!saved.answers;
+  if (dr && !saved.answers && (dr.step || 0) > 0) setTimeout(() => toast(T('쓰던 곳부터 이어서 써요', 'Picking up where you left off')), 50);
+}
+function reflAnswerText(id, d) {
+  if (id === 'rating') return d.rating ? '★'.repeat(d.rating) + '☆'.repeat(5 - d.rating) : '';
+  if (id === 'note') return d.note || '';
+  const q = REFLECT_Q.find(x => x.id === id); const v = d[id];
+  if (q.multi) return (v || []).map(i => T(q.opts[i][0], q.opts[i][1])).join(', ');
+  return typeof v === 'number' ? T(q.opts[v][0], q.opts[v][1]) : '';
+}
+const reflTitle = id => id === 'ctx' ? T('언제, 어디서였나요?', 'When and where?') : id === 'rating' ? T('오늘의 나, 별점으로', 'Overall rating') : id === 'note' ? T('남기고 싶은 메모가 있나요?', 'Anything to note down?') : (q => T(q.ko, q.en))(REFLECT_Q.find(x => x.id === id));
+function reflStepBody(id, d, single) {
+  const ctx = reflCtx();
+  const nextBtn = label => `<div class="rspace"></div><button class="btn block rcta" data-act="rnext">${label || (single ? T('완료', 'Done') : T('다음', 'Next'))}</button>`;
+  let h = `<h2 class="rq-h" tabindex="-1" id="rqh">${esc(reflTitle(id))}</h2>`;
+  if (id === 'ctx') {
+    h += `<div class="f" style="font-size:13px;color:#52525B;margin-bottom:6px">${T('클럽', 'Club')}</div><div class="seg" style="margin-bottom:14px;flex-wrap:wrap;border-radius:22px">${myClubIds().map(cid => `<button class="${cid === ctx.c ? 'on' : ''}" style="flex:1 0 auto;white-space:nowrap;padding:0 14px" data-act="rclub" data-c="${cid}">${esc(clubName(cid))}</button>`).join('')}<button class="${!ctx.c ? 'on' : ''}" style="flex:1 0 auto;white-space:nowrap;padding:0 14px" data-act="rclub" data-c="">${T('모임 밖', 'Outside')}</button></div>
+    <label class="f">${T('날짜', 'Date')}<input class="inp" type="date" id="r_date" data-act-change="rdate" value="${esc(S.draft.rdate)}"></label>
+    <label class="f">${T('내 역할', 'My role')}<input class="inp" id="r_role" value="${esc(ctx.roleTxt)}" ${ctx.m ? 'readonly' : `placeholder="${T(ctx.c ? '이 날짜에 모임이 없어요' : '예: 회사 발표', ctx.c ? 'No meeting on this date' : 'e.g. Work talk')}"`}></label>
+    ${ctx.m ? `<div class="xs muted">${esc(meetingLabel(ctx.c, ctx.m))}</div>` : ''}${nextBtn()}`;
+  } else if (id === 'rating') {
+    h += `<div class="row" style="justify-content:center;gap:6px;margin-top:8px">${[1, 2, 3, 4, 5].map(v => `<button class="rstar" data-act="rstar" data-v="${v}" aria-label="${T(`별 ${v}개`, `${v} star${v > 1 ? 's' : ''}`)}" aria-pressed="${(d.rating || 0) >= v}" style="color:${(d.rating || 0) >= v ? '#772432' : '#D5DADA'}">${IC.star}</button>`).join('')}</div>${nextBtn()}`;
+  } else if (id === 'note') {
+    h += `<textarea class="inp" id="r_note" style="min-height:160px;padding:12px 14px" placeholder="${T('느낀 점, 다음에 해보고 싶은 것을 자유롭게 적어요.', 'Anything you noticed or want to try next time.')}">${esc(d.note || '')}</textarea><div class="xs muted" style="margin-top:6px">${T('선택 · 나만 볼 수 있어요', 'Optional · only you can see this')}</div>${single ? nextBtn() : `<div class="rspace"></div><button class="btn block rcta" data-act="savereflect" data-id="${esc(S.sub.key)}">${T('기록 남기기', 'Save reflection')}</button>`}`;
+  } else {
+    const q = REFLECT_Q.find(x => x.id === id);
+    h += q.opts.map((o, i) => { const on = q.multi ? (d[q.id] || []).includes(i) : d[q.id] === i; return `<button class="ropt ${on ? 'on' : ''}" data-act="rq" data-q="${q.id}" data-i="${i}" aria-pressed="${on}">${esc(T(o[0], o[1]))}</button>`; }).join('');
+    if (q.multi) h += `<div class="xs muted" style="margin-top:2px">${T('여러 개 골라도 돼요', 'Pick as many as you like')}</div>${nextBtn()}`;
+    else if (single) h += nextBtn();
+  }
+  return h;
+}
+function vReflect() {
+  reflInit();
+  const sub = S.sub; const key = sub.key; const d = S.draft.refl; const steps = reflSteps(); const ctx = reflCtx();
+  const sideLine = sub.c && sub.m ? ctx.line : T('잘했다·못했다가 아니라, 어땠는지만 남겨요.', 'No grades, just how it went.');
+  if (S.draft.rdone) {
+    return `${topbar(T('복기', 'Reflection'), ctx.line)}<div class="card rwrap" style="text-align:center"><div class="rdoneic">${IC.ok}</div><h2 style="margin:0 0 8px">${T('기록했어요', 'Saved')}</h2><p class="small muted" style="line-height:1.6;margin:0">${esc(S.draft.rdone)}</p><div class="rspace"></div><button class="btn block rcta" data-act="rdoneclose">${T('기록 보기', 'See my log')}</button></div>`;
+  }
+  if (S.draft.rmode === 'summary' && !S.draft.rfield) {
+    const rows = [['ctx', T('언제, 어디서', 'When and where'), ctx.line], ...REFLECT_Q.map((q, qi) => [q.id, `${qi + 1}. ${T(q.ko, q.en)}`, reflAnswerText(q.id, d)]), ['rating', T('별점', 'Rating'), reflAnswerText('rating', d)], ['note', T('메모', 'Notes'), reflAnswerText('note', d)]];
+    return `${topbar(T('복기 수정', 'Edit reflection'), T('고칠 항목을 눌러 주세요.', 'Tap an item to change it.'))}
+    ${S.draft.rdirty ? `<div class="card row" style="gap:8px;padding:12px 16px;background:#FFF8E1"><div class="grow small">${T('저장하지 않은 변경 사항이 있어요.', 'You have unsaved changes.')}</div><button class="btn sec sm" data-act="rdiscard">${T('되돌리기', 'Discard')}</button></div>` : ''}
+    <div class="card" style="padding:4px 0">${rows.map(([id, label, ans]) => `<button class="rsum" data-act="rfield" data-f="${id}"><div class="grow"><div class="xs muted">${esc(label)}</div><div class="small ${ans ? '' : 'muted'}" style="margin-top:2px;white-space:pre-wrap">${ans ? esc(ans.length > 80 ? ans.slice(0, 80) + '…' : ans) : T('답하지 않음', 'Not answered')}</div></div><span aria-hidden="true" class="muted">›</span></button>`).join('')}</div>
+    <div style="padding:0 12px" class="two"><button class="btn red block" data-act="delrefl" data-id="${esc(key)}">${T('삭제', 'Delete')}</button><button class="btn block" data-act="savereflect" data-id="${esc(key)}">${T('저장', 'Save')}</button></div>`;
+  }
+  if (S.draft.rfield) {
+    return `${topbar(T('복기 수정', 'Edit reflection'), ctx.line)}<div class="card rwrap">${reflStepBody(S.draft.rfield, d, true)}</div>`;
+  }
+  const i = Math.min(S.draft.rstep || 0, steps.length - 1); const id = steps[i];
+  return `${topbar(T('복기', 'Reflection'), sideLine)}
+  <div class="card rwrap">
+    <div class="row between" style="margin:-4px -6px 0"><button class="rnav" data-act="rprev" aria-label="${T('이전 질문', 'Previous question')}" style="visibility:${i > 0 ? 'visible' : 'hidden'}">${IC.back}</button><span class="xs muted">${i + 1} / ${steps.length}${i === 0 ? T(' · 약 1분', ' · about 1 min') : ''}</span><button class="rnav xs" data-act="rskip" style="visibility:${i < steps.length - 1 && id !== 'ctx' ? 'visible' : 'hidden'}">${T('건너뛰기', 'Skip')}</button></div>
+    <div class="rbar" role="progressbar" aria-valuemin="1" aria-valuemax="${steps.length}" aria-valuenow="${i + 1}" aria-label="${T('진행률', 'Progress')}">${steps.map((_, k) => `<button data-act="rjump" data-i="${k}" class="${k <= i ? 'on' : ''}" aria-label="${T(`${k + 1}번 질문`, `Question ${k + 1}`)}"></button>`).join('')}</div>
+    ${reflStepBody(id, d, false)}
+  </div>`;
+}
+function reflKeep() { const d = S.draft.refl; if (!d) return; const n = document.getElementById('r_note'); if (n) d.note = n.value; const r = document.getElementById('r_role'); if (r && !r.readOnly) S.draft.rrole = r.value; const dt = document.getElementById('r_date'); if (dt && dt.value) S.draft.rdate = dt.value; }
+function reflGo(fn) { reflKeep(); fn(); if (S.draft.redit) S.draft.rdirty = true; rDraftSave(); render(); const h = document.getElementById('rqh'); if (h) h.focus({ preventScroll: true }); }
+function reflTrend(key, doc) {
+  const prev = Object.entries(S.refl).filter(([k, r]) => k !== key && r && r.answers && (r.date || '') <= doc.date).map(([, r]) => r).sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 3);
+  const msgs = { nerve: T('시작할 때 덜 긴장했어요.', 'you were less nervous at the start.'), conf: T('끝나고 자신감이 더 올라갔어요.', 'your confidence rose more afterwards.'), time: T('시간을 더 잘 지켰어요.', 'you kept to time better.'), words: T('원하는 표현이 더 잘 떠올랐어요.', 'the right words came more easily.') };
+  if (prev.length) for (const id of ['nerve', 'conf', 'time', 'words']) {
+    const cur = qScore(doc.answers, id); const ps = prev.map(r => qScore(r.answers, id)).filter(v => v !== null);
+    if (cur !== null && ps.length && cur > ps.reduce((x, y) => x + y, 0) / ps.length) return ps.length === 1 ? T(`지난번보다 ${msgs[id]}`, `Compared with last time, ${msgs[id]}`) : T(`지난 ${ps.length}번보다 ${msgs[id]}`, `Compared with your last ${ps.length}, ${msgs[id]}`);
+  }
+  const n = Object.keys(S.refl).filter(k => k !== key).length + 1;
+  return T(`${n}번째 복기예요. 꾸준히 쌓이고 있어요.`, `That's reflection #${n}. It's adding up.`);
 }
 
 /* ================= paste (VPE) ================= */
@@ -1365,6 +1447,7 @@ function addMeetingSheet(c, date) {
 /* ================= event handling ================= */
 document.addEventListener('input', e => {
   const t = e.target;
+  if (S.view === 'reflect' && (t.id === 'r_note' || t.id === 'r_role')) { reflKeep(); if (S.draft.redit) S.draft.rdirty = true; clearTimeout(rDraftSave.t); rDraftSave.t = setTimeout(rDraftSave, 300); }
   if (t.dataset.actInput === 'paste') { S.draft.paste = t.value; clearTimeout(vPaste.t); vPaste.t = setTimeout(() => { const pos = t.selectionStart; render(); const nb = document.getElementById('pastebox'); if (nb) { nb.focus(); try { nb.setSelectionRange(pos, pos); } catch (x) {} } }, 350); }
   if (t.dataset.actInput === 'clubq') { S.draft.clubq = t.value; clearTimeout(clubJoin.t); clubJoin.t = setTimeout(() => { render(); const nb = document.getElementById('clubq'); if (nb) { nb.focus(); nb.setSelectionRange(nb.value.length, nb.value.length); } }, 250); }
   if (t.dataset.item && S.draft.flow) { const [bi, ii] = t.dataset.item.split(':').map(Number); const it = S.draft.flow[bi] && S.draft.flow[bi].items && S.draft.flow[bi].items[ii]; if (it) it.text = t.value; if (S.view === 'export') { clearTimeout(afterRender.t); afterRender.t = setTimeout(() => { const cv = document.getElementById('agcanvas'); const m = getM(S.sub.c, S.sub.m); if (cv && m) drawAgenda(cv, S.sub.c, m); }, 300); } }
@@ -1379,7 +1462,7 @@ document.addEventListener('change', e => {
     im.onerror = () => { URL.revokeObjectURL(url); toast(T('이미지를 읽지 못했어요', 'Could not read the image')); };
     im.src = url; return;
   }
-  if (e.target.dataset.flow === 'min') keepInputs(render); if (e.target.dataset.actChange === 'rdate') { if (S.draft.refl) S.draft.refl.note = val('r_note'); S.draft.rdate = e.target.value; reflFill(); } });
+  if (e.target.dataset.flow === 'min') keepInputs(render); if (e.target.dataset.actChange === 'rdate') reflGo(() => { S.draft.rdate = e.target.value; S.draft.rrole = undefined; }); });
 document.addEventListener('click', async e => {
   const el = e.target.closest('[data-act]');
   if (!el) return;
@@ -1397,7 +1480,7 @@ document.addEventListener('click', async e => {
       case 'authmode': S.authMode = el.dataset.v; render(); break;
       case 'login': { try { sessionStorage.setItem('toastmate-auth', S.authMode === 'signup' ? 'signup' : 'signin'); } catch (x) {} const { error } = await Store.supa.auth.signInWithOAuth({ provider: el.dataset.p, options: { redirectTo: location.origin + location.pathname } }); if (error) toast(T('로그인을 시작하지 못했어요', 'Could not start sign-in')); break; }
       case 'logout': await Store.supa.auth.signOut(); location.replace(location.pathname); break;
-      case 'back': S.draft = {}; S.sheet = null; go(S.backTo || 'home'); break;
+      case 'back': if (S.view === 'reflect' && S.draft.refl && !S.draft.rdone && (!S.draft.redit || S.draft.rdirty)) { reflKeep(); rDraftSave(); } S.draft = {}; S.sheet = null; go(S.backTo || 'home'); break;
       case 'closesheet': S.sheet = null; S.draft.sp = null; render(); break;
       case 'club': S.curClub = c; render(); break;
       case 'lang': keepInputs(); { const keep = {}; $app.querySelectorAll('input[id],select[id]').forEach(i => keep[i.id] = i.value); S._keep = keep; } S.lang = el.dataset.l; try { localStorage.setItem('toastmate-lang', S.lang); } catch (x) {} document.documentElement.lang = S.lang; if (S.me && S.me.name) Store.update('people/' + S.uid, { lang: S.lang }); render(); break;
@@ -1482,22 +1565,37 @@ document.addEventListener('click', async e => {
       case 'saveevent': { const t = val('ev_t'), d = val('ev_d'); if (!t || !d) { toast(T('행사명과 날짜를 입력해 주세요', 'Enter a title and date')); return; } const link = val('ev_l'); const url = v => /^https?:\/\//.test(v) ? v : ''; await Store.set('events/e' + uidGen(), { title: t, date: d, time: val('ev_time'), desc: val('ev_desc'), venue: val('ev_p'), address: val('ev_addr'), maps: { naver: url(val('ev_naver')), kakao: url(val('ev_kakao')), google: url(val('ev_google')) }, link: url(link), by: S.uid }); S.sheet = null; toast(T('행사를 추가했어요', 'Event added')); break; }
       case 'delevent': await Store.del('events/' + el.dataset.e); S.sheet = null; render(); break;
       case 'openreserve': S.backTo = S.view === 'reserve' ? S.backTo : (['home', 'meetings'].includes(S.view) ? S.view : 'meetings'); S.view = 'reserve'; S.sub = { c, m: mid }; S.sheet = null; render(); break;
-      case 'openreflect': S.backTo = 'meetings'; S.draft.refl = null; S.draft.rclub = undefined; S.draft.rdate = undefined; S.view = 'reflect'; S.sub = { c, m: mid, key: c + '_' + mid }; S.sheet = null; render(); break;
+      case 'openreflect': S.backTo = 'meetings'; S.draft = {}; S.view = 'reflect'; S.sub = { c, m: mid, key: c + '_' + mid }; S.sheet = null; render(); break;
       case 'openpaste': S.backTo = S.view === 'home' ? 'home' : 'meetings'; S.draft.paste = ''; S.view = 'paste'; S.sub = { c, m: mid }; S.sheet = null; render(); break;
       case 'openflow': S.backTo = 'meetings'; S.draft.flow = null; S.view = 'flow'; S.sub = { c, m: mid }; render(); break;
       case 'openflowtpl': S.backTo = 'settings'; S.draft.flow = null; S.view = 'flow'; S.sub = { c, template: true }; render(); break;
       case 'openexport': S.backTo = S.view === 'home' ? 'home' : 'meetings'; S.view = 'export'; S.sub = { c, m: mid }; S.sheet = null; render(); break;
       case 'openclubset': S.backTo = 'settings'; S.draft = {}; S.view = 'clubset'; S.sub = { c }; render(); break;
-      case 'rq': { const q = REFLECT_Q.find(x => x.id === el.dataset.q); const i = Number(el.dataset.i); const d = S.draft.refl; d.note = val('r_note'); if (q.multi) { const s = new Set(d[q.id] || []); s.has(i) ? s.delete(i) : s.add(i); d[q.id] = [...s]; } else d[q.id] = d[q.id] === i ? undefined : i; keepInputs(render); break; }
+      case 'rq': {
+        const q = REFLECT_Q.find(x => x.id === el.dataset.q); const i = Number(el.dataset.i); const d = S.draft.refl;
+        if (q.multi) { reflGo(() => { const st = new Set(d[q.id] || []); st.has(i) ? st.delete(i) : st.add(i); d[q.id] = [...st]; }); break; }
+        reflGo(() => { d[q.id] = i; });
+        clearTimeout(vReflect.t); vReflect.t = setTimeout(() => { if (S.view !== 'reflect') return; reflGo(() => { if (S.draft.rfield) S.draft.rfield = null; else S.draft.rstep = Math.min((S.draft.rstep || 0) + 1, reflSteps().length - 1); }); }, 250);
+        break;
+      }
+      case 'rnext': reflGo(() => { if (S.draft.rfield) S.draft.rfield = null; else S.draft.rstep = Math.min((S.draft.rstep || 0) + 1, reflSteps().length - 1); }); break;
+      case 'rprev': clearTimeout(vReflect.t); reflGo(() => { S.draft.rstep = Math.max((S.draft.rstep || 0) - 1, 0); }); break;
+      case 'rskip': clearTimeout(vReflect.t); reflGo(() => { S.draft.rstep = Math.min((S.draft.rstep || 0) + 1, reflSteps().length - 1); }); break;
+      case 'rjump': clearTimeout(vReflect.t); reflGo(() => { S.draft.rstep = Number(el.dataset.i); }); break;
+      case 'rfield': reflKeep(); S.draft.rfield = el.dataset.f; render(); { const h = document.getElementById('rqh'); if (h) h.focus({ preventScroll: true }); } break;
+      case 'rdiscard': rDraftClear(S.sub.key); S.draft.refl = null; render(); break;
+      case 'rdoneclose': S.draft = {}; S.logTab = 'refl'; go('log'); break;
       case 'savereflect': {
-        const d = S.draft.refl; d.note = val('r_note'); const key = el.dataset.id; const rc = S.draft.rclub; const date = val('r_date') || todayStr(); const m = rc ? meetingsOf(rc).find(x => x.date === date) : null;
+        reflKeep(); const d = S.draft.refl; const key = el.dataset.id; const rc = S.draft.rclub; const date = S.draft.rdate || todayStr(); const m = rc ? meetingsOf(rc).find(x => x.date === date) : null; const wasNew = !S.draft.redit;
         const doc = { answers: JSON.parse(JSON.stringify(d)), savedAt: Date.now(), date };
         if (m) Object.assign(doc, { club: rc, meeting: m.id, roles: myRolesIn(rc, m) });
-        else Object.assign(doc, { club: rc || '', roleText: val('r_role') });
-        await Store.set(`data/users/${S.uid}/${key}`, doc); toast(T('기록했어요', 'Saved')); S.draft.refl = null; S.draft.rclub = undefined; S.draft.rdate = undefined; S.logTab = 'refl'; go('log'); break;
+        else Object.assign(doc, { club: rc || '', roleText: S.draft.rrole !== undefined ? S.draft.rrole : ((S.refl[key] || {}).roleText || '') });
+        await Store.set(`data/users/${S.uid}/${key}`, doc); rDraftClear(key);
+        if (wasNew) { S.draft.rdone = reflTrend(key, doc); render(); break; }
+        toast(T('기록했어요', 'Saved')); S.draft = {}; S.logTab = 'refl'; go('log'); break;
       }
       case 'delreflask': { if (!confirm(T('이 복기를 삭제할까요? 되돌릴 수 없어요.', 'Delete this reflection? This cannot be undone.'))) return; await Store.del(`data/users/${S.uid}/${el.dataset.id}`); toast(T('삭제했어요', 'Deleted')); render(); break; }
-      case 'delrefl': await Store.del(`data/users/${S.uid}/${el.dataset.id}`); S.draft.refl = null; S.logTab = 'refl'; toast(T('삭제했어요', 'Deleted')); go('log'); break;
+      case 'delrefl': if (!confirm(T('이 복기를 삭제할까요? 되돌릴 수 없어요.', 'Delete this reflection? This cannot be undone.'))) return; await Store.del(`data/users/${S.uid}/${el.dataset.id}`); rDraftClear(el.dataset.id); S.draft = {}; S.logTab = 'refl'; toast(T('삭제했어요', 'Deleted')); go('log'); break;
       case 'dlfmt': S.dlFmt = el.dataset.f; render(); break;
       case 'chair': await Store.update(mPath(c, mid), { chair: el.dataset.id }); toast(T('의장을 바꿨어요', 'Chair updated')); break;
       case 'wrapped': S.sheet = wrappedSheet; render(); break;
@@ -1546,10 +1644,10 @@ document.addEventListener('click', async e => {
       case 'dcpclub': S.dcpClub = c; render(); break;
       case 'dcpstep': { const cc = S.dcpClub, py = progYear(); const cur = (((S.clubs[cc] || {}).dcp || {})[py] || {})[el.dataset.f] || 0; const v = Math.max(0, Number(cur) + Number(el.dataset.d)); await Store.update('clubs/' + cc, { dcp: { [py]: { [el.dataset.f]: v } } }); break; }
       case 'dcptog': { const cc = S.dcpClub, py = progYear(); const cur = (((S.clubs[cc] || {}).dcp || {})[py] || {})[el.dataset.f]; await Store.update('clubs/' + cc, { dcp: { [py]: { [el.dataset.f]: !cur } } }); break; }
-      case 'rstar': { const d = S.draft.refl; d.note = val('r_note'); const v = Number(el.dataset.v); d.rating = d.rating === v ? 0 : v; keepInputs(render); break; }
-      case 'rclub': { if (S.draft.refl) S.draft.refl.note = val('r_note'); S.draft.rdate = val('r_date') || S.draft.rdate; S.draft.rclub = c || ''; reflFill(); break; }
-      case 'newrefl': S.backTo = 'log'; S.draft.refl = null; S.draft.rclub = undefined; S.draft.rdate = undefined; S.view = 'reflect'; S.sub = { key: 'r' + uidGen() }; render(); break;
-      case 'openrefl': { const r = S.refl[el.dataset.id] || {}; S.backTo = 'log'; S.draft.refl = null; S.draft.rclub = undefined; S.draft.rdate = undefined; S.view = 'reflect'; S.sub = { key: el.dataset.id, c: r.club, m: r.meeting }; render(); break; }
+      case 'rstar': { const d = S.draft.refl; const v = Number(el.dataset.v); reflGo(() => { d.rating = d.rating === v ? 0 : v; }); break; }
+      case 'rclub': reflGo(() => { S.draft.rclub = c || ''; S.draft.rrole = undefined; }); break;
+      case 'newrefl': S.backTo = 'log'; S.draft = {}; S.view = 'reflect'; S.sub = { key: rOpenNewDraftKey() || ('r' + uidGen()) }; render(); break;
+      case 'openrefl': { const r = S.refl[el.dataset.id] || {}; S.backTo = 'log'; S.draft = {}; S.view = 'reflect'; S.sub = { key: el.dataset.id, c: r.club, m: r.meeting }; render(); break; }
       case 'addscs': { const title = val('scs_title'); if (!title) { toast(T('발표 제목을 입력해 주세요', 'Enter a title')); return; } const list = [...((S.me && S.me.scs) || []), { id: 's' + uidGen(), title, date: val('scs_date') || todayStr(), club: val('scs_club') }]; await Store.update('people/' + S.uid, { scs: list }); S.me.scs = list; toast(T('기록했어요', 'Saved')); render(); break; }
       case 'delscs': { const list = ((S.me && S.me.scs) || []).filter(x => x.id !== el.dataset.id); await Store.update('people/' + S.uid, { scs: list }); S.me.scs = list; render(); break; }
       case 'applypaste': {
